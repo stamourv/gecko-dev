@@ -8267,19 +8267,40 @@ bool
 IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
                             types::HeapTypeSetKey *property)
 {
+    fprintf(stderr, "COACH: trying to get definite slot\n");
+    if (!types)
+        fprintf(stderr, "COACH:    failure, no typeset\n");
+    else if (types->unknownObject())
+        fprintf(stderr, "COACH:    failure, unknown object type\n");
+    else if (types->getObjectCount() != 1){
+        fprintf(stderr, "COACH:    failure, %d possible object types\n",
+                types->getObjectCount());
+    }
+
     if (!types || types->unknownObject() || types->getObjectCount() != 1)
         return false;
 
     types::TypeObjectKey *type = types->getObject(0);
+
+    if (type->unknownProperties())
+        fprintf(stderr, "COACH:    failure, unknown properties\n");
+    if (type->singleton())
+        fprintf(stderr, "COACH:    failure, singleton\n"); // singletons are not guaranteed to have fields in fixed slots
+    
     if (type->unknownProperties() || type->singleton())
         return false;
 
     jsid id = NameToId(name);
 
     *property = type->property(id);
-    return property->maybeTypes() &&
-           property->maybeTypes()->definiteProperty() &&
-           !property->nonData(constraints());
+    bool success = property->maybeTypes() &&
+        property->maybeTypes()->definiteProperty() &&
+        !property->nonData(constraints());
+    if (success)
+        fprintf(stderr, "COACH:    success\n");
+    else
+        fprintf(stderr, "COACH:    failure, property not in a fixed slot\n");
+    return success;
 }
 
 bool
@@ -8621,6 +8642,13 @@ IonBuilder::jsop_getprop(PropertyName *name)
         return resumeAfter(call) && pushTypeBarrier(call, types, BarrierKind::TypeSet);
     }
 
+    fprintf(stderr, "COACH: optimizing getprop: %s:%d #%u:%05u\n",
+            script()->filename(), script()->lineno(),
+            script()->id(), script()->pcToOffset(pc));
+    fprintf(stderr, "COACH:    types:");
+    types->print();
+    fprintf(stderr, "\n");
+
     // Try to hardcode known constants.
     if (!getPropTryConstant(&emitted, obj, name, types) || emitted)
         return emitted;
@@ -8655,6 +8683,8 @@ IonBuilder::jsop_getprop(PropertyName *name)
     current->push(call);
     if (!resumeAfter(call))
         return false;
+
+    fprintf(stderr, "COACH:    failure, falling back to a call\n");
 
     return pushTypeBarrier(call, types, BarrierKind::TypeSet);
 }
@@ -8927,8 +8957,10 @@ CanInlinePropertyOpShapes(const BaselineInspector::ShapeVector &shapes)
         // dictionary mode. We cannot be sure that the shape is still a
         // lastProperty, and calling Shape::search() on dictionary mode
         // shapes that aren't lastProperty is invalid.
-        if (shapes[i]->inDictionary())
+        if (shapes[i]->inDictionary()){
+            fprintf(stderr, "COACH:    failure, shape in dictionary mode\n");
             return false;
+        }
     }
 
     return true;
@@ -8967,15 +8999,23 @@ bool
 IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName *name,
                                    BarrierKind barrier, types::TemporaryTypeSet *types)
 {
+    fprintf(stderr, "COACH: trying getprop inline access\n");
     JS_ASSERT(*emitted == false);
-    if (obj->type() != MIRType_Object)
+    if (obj->type() != MIRType_Object){
+        fprintf(stderr, "COACH:    failure, MIR type is not object: %s\n",
+                StringFromMIRType(obj->type()));
         return true;
+    }
 
     BaselineInspector::ShapeVector shapes(alloc());
     if (!inspector->maybeShapesForPropertyOp(pc, shapes))
         return false;
 
-    if (shapes.empty() || !CanInlinePropertyOpShapes(shapes))
+    if (shapes.empty()) {
+        fprintf(stderr, "COACH:    failure, no known shapes\n");
+        return true;
+    }
+    if (!CanInlinePropertyOpShapes(shapes))
         return true;
 
     MIRType rvalType = types->getKnownMIRType();
@@ -8995,6 +9035,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
 
         if (!loadSlot(obj, shape, rvalType, barrier, types))
             return false;
+
+        fprintf(stderr, "COACH:    success, inlining monomorphic getprop\n");
 
         *emitted = true;
         return true;
@@ -9024,6 +9066,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
         if (!loadSlot(obj, propShapes[0], rvalType, barrier, types))
             return false;
 
+        fprintf(stderr, "COACH:    success, inlining polymorphic (really monomorphic) getprop\n");
+
         *emitted = true;
         return true;
     }
@@ -9044,6 +9088,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
     if (!pushTypeBarrier(load, types, barrier))
         return false;
 
+    fprintf(stderr, "COACH:    success, inlining polymorphic getprop\n");
+
     *emitted = true;
     return true;
 }
@@ -9054,12 +9100,20 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
 {
     JS_ASSERT(*emitted == false);
 
+    fprintf(stderr, "COACH: trying to emit a polymorphic cache\n");
+
     // The input value must either be an object, or we should have strong suspicions
     // that it can be safely unboxed to an object.
     if (obj->type() != MIRType_Object) {
         types::TemporaryTypeSet *types = obj->resultTypeSet();
-        if (!types || !types->objectOrSentinel())
+        if (!types){
+            fprintf(stderr, "COACH:    failure, no type info\n");
             return true;
+        }
+        if (!types->objectOrSentinel()){
+            fprintf(stderr, "COACH:    failure, input may not be an object\n");
+            return true;
+        }
     }
 
     // Since getters have no guaranteed return values, we must barrier in order to be
@@ -9109,6 +9163,8 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
 
     if (!pushTypeBarrier(load, types, barrier))
         return false;
+
+    fprintf(stderr, "COACH:    success\n");
 
     *emitted = true;
     return true;
