@@ -101,6 +101,7 @@ BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
         } else if (stub->isSetProp_Native()) {
             shape = stub->toSetProp_Native()->shape();
         } else {
+            fprintf(stderr, "COACH:        failure, property access not native\n");
             shapes.clear();
             return true;
         }
@@ -122,16 +123,26 @@ BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
     }
 
     if (stub->isGetProp_Fallback()) {
-        if (stub->toGetProp_Fallback()->hadUnoptimizableAccess())
+        if (stub->toGetProp_Fallback()->hadUnoptimizableAccess()){
+            fprintf(stderr, "COACH:        failure, fallback had unoptimizable access\n"); // TODO under what circumstances does this happen?
             shapes.clear();
+        }
     } else {
-        if (stub->toSetProp_Fallback()->hadUnoptimizableAccess())
+        if (stub->toSetProp_Fallback()->hadUnoptimizableAccess()){
+            fprintf(stderr, "COACH:        failure, fallback had unoptimizable access\n"); // TODO under what circumstances does this happen?
             shapes.clear();
+        }
     }
 
     // Don't inline if there are more than 5 shapes.
-    if (shapes.length() > 5)
+    size_t nShapes = shapes.length();
+    if (nShapes > 5){
+        fprintf(stderr, "COACH:        failure, too many shapes (%d)\n",
+                nShapes);
         shapes.clear();
+    } else if (nShapes == 0){
+        fprintf(stderr, "COACH:        failure, no known shapes\n");
+    }
 
     return true;
 }

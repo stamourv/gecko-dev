@@ -9019,10 +9019,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
     if (!inspector->maybeShapesForPropertyOp(pc, shapes))
         return false;
 
-    if (shapes.empty()) {
-        fprintf(stderr, "COACH:        failure, no known shapes\n");
+    if (shapes.empty())
         return true;
-    }
     if (!CanInlinePropertyOpShapes(shapes))
         return true;
 
@@ -9557,10 +9555,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
     if (!inspector->maybeShapesForPropertyOp(pc, shapes))
         return false;
 
-    if (shapes.empty()){
-        fprintf(stderr, "COACH:        failure, no known shapes\n");
+    if (shapes.empty())
         return true;
-    }
 
     if (!CanInlinePropertyOpShapes(shapes))
         return true;
