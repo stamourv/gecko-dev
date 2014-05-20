@@ -8267,7 +8267,6 @@ bool
 IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
                             types::HeapTypeSetKey *property)
 {
-    fprintf(stderr, "COACH: trying to get definite slot\n");
     if (!types)
         fprintf(stderr, "COACH:    failure, no typeset\n");
     else if (types->unknownObject())
@@ -8296,10 +8295,8 @@ IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
     bool success = property->maybeTypes() &&
         property->maybeTypes()->definiteProperty() &&
         !property->nonData(constraints());
-    if (success)
-        fprintf(stderr, "COACH:    success\n");
-    else
-        fprintf(stderr, "COACH:    failure, property not in a fixed slot\n");
+    if (!success)
+        fprintf(stderr, "COACH:    failure, property not in a fixed slot\n"); // tell user: maybe it's not an ownProperty? (I think that can cause failure here)
     return success;
 }
 
@@ -8834,6 +8831,9 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
                                    BarrierKind barrier, types::TemporaryTypeSet *types)
 {
     JS_ASSERT(*emitted == false);
+
+    fprintf(stderr, "COACH: trying getprop with definite slot\n");
+
     types::HeapTypeSetKey property;
     if (!getDefiniteSlot(obj->resultTypeSet(), name, &property))
         return true;
@@ -8854,6 +8854,8 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
 
     if (!pushTypeBarrier(fixed, types, barrier))
         return false;
+
+    fprintf(stderr, "COACH:    success\n");
 
     *emitted = true;
     return true;
