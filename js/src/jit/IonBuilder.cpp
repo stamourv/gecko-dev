@@ -9279,21 +9279,34 @@ IonBuilder::jsop_setprop(PropertyName *name)
         return resumeAfter(ins);
     }
 
+    fprintf(stderr, "COACH: optimizing setprop: %s:%d #%u:%05u\n",
+            script()->filename(), script()->lineno(),
+            script()->id(), script()->pcToOffset(pc));
+    fprintf(stderr, "COACH:    obj types:");
+    if(obj->resultTypeSet()) obj->resultTypeSet()->print();
+    fprintf(stderr, "\nCOACH:    value types:");
+    if(value->resultTypeSet()) value->resultTypeSet()->print();
+    fprintf(stderr, "\n");
+
     // Add post barrier if needed.
     if (NeedsPostBarrier(info(), value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
     // Try to inline a common property setter, or make a call.
-    if (!setPropTryCommonSetter(&emitted, obj, name, value) || emitted)
+    if (!setPropTryCommonSetter(&emitted, obj, name, value) || emitted){
+        fprintf(stderr, "COACH:        success, common setter\n");
         return emitted;
+    }
 
     types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
     bool barrier = PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current, &obj, name, &value,
                                                  /* canModify = */ true);
 
     // Try to emit stores to known binary data blocks
-    if (!setPropTryTypedObject(&emitted, obj, name, value) || emitted)
+    if (!setPropTryTypedObject(&emitted, obj, name, value) || emitted){
+        fprintf(stderr, "COACH:        success, known binary data block\n");
         return emitted;
+    }
 
     // Try to emit store from definite slots.
     if (!setPropTryDefiniteSlot(&emitted, obj, name, value, barrier, objTypes) || emitted)
@@ -9306,6 +9319,8 @@ IonBuilder::jsop_setprop(PropertyName *name)
     // Try to emit a polymorphic cache.
     if (!setPropTryCache(&emitted, obj, name, value, barrier, objTypes) || emitted)
         return emitted;
+
+    fprintf(stderr, "COACH:        failure, falling back to a call\n");
 
     // Emit call.
     MInstruction *ins = MCallSetProperty::New(alloc(), obj, value, name, script()->strict());
@@ -9492,15 +9507,21 @@ IonBuilder::setPropTryDefiniteSlot(bool *emitted, MDefinition *obj,
 {
     JS_ASSERT(*emitted == false);
 
-    if (barrier)
+    fprintf(stderr, "COACH:    trying setprop with definite slot\n");
+
+    if (barrier){
+        fprintf(stderr, "COACH:        failure, would require a barrier\n"); // tell user: setting to a type that you haven't set to before, don't do that
         return true;
+    }
 
     types::HeapTypeSetKey property;
     if (!getDefiniteSlot(obj->resultTypeSet(), name, &property))
         return true;
 
-    if (property.nonWritable(constraints()))
+    if (property.nonWritable(constraints())){
+        fprintf(stderr, "COACH:        failure, object non writable\n");
         return true;
+    }
 
     MStoreFixedSlot *fixed = MStoreFixedSlot::New(alloc(), obj, property.maybeTypes()->definiteSlot(), value);
     current->add(fixed);
@@ -9512,6 +9533,8 @@ IonBuilder::setPropTryDefiniteSlot(bool *emitted, MDefinition *obj,
     if (!resumeAfter(fixed))
         return false;
 
+    fprintf(stderr, "COACH:        success\n");
+
     *emitted = true;
     return true;
 }
@@ -9522,17 +9545,22 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
                                    MDefinition *value, bool barrier,
                                    types::TemporaryTypeSet *objTypes)
 {
+    fprintf(stderr, "COACH:    trying setprop inline access\n");
     JS_ASSERT(*emitted == false);
 
-    if (barrier)
+    if (barrier){
+        fprintf(stderr, "COACH:        failure, would require a barrier\n");
         return true;
+    }
 
     BaselineInspector::ShapeVector shapes(alloc());
     if (!inspector->maybeShapesForPropertyOp(pc, shapes))
         return false;
 
-    if (shapes.empty())
+    if (shapes.empty()){
+        fprintf(stderr, "COACH:        failure, no known shapes\n");
         return true;
+    }
 
     if (!CanInlinePropertyOpShapes(shapes))
         return true;
@@ -9553,6 +9581,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
         bool needsBarrier = objTypes->propertyNeedsBarrier(constraints(), NameToId(name));
         if (!storeSlot(obj, shape, value, needsBarrier))
             return false;
+
+        fprintf(stderr, "COACH:        success, inlining monomorphic setprop\n");
 
         *emitted = true;
         return true;
@@ -9583,6 +9613,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
         if (!storeSlot(obj, propShapes[0], value, needsBarrier))
             return false;
 
+        fprintf(stderr, "COACH:        success, inlining polymorphic (really monomorphic) setprop\n");
+
         *emitted = true;
         return true;
     }
@@ -9605,6 +9637,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
     if (!resumeAfter(ins))
         return false;
 
+    fprintf(stderr, "COACH:        success, inlining polymorphic setprop\n");
+
     *emitted = true;
     return true;
 }
@@ -9615,6 +9649,8 @@ IonBuilder::setPropTryCache(bool *emitted, MDefinition *obj,
                             bool barrier, types::TemporaryTypeSet *objTypes)
 {
     JS_ASSERT(*emitted == false);
+
+    fprintf(stderr, "COACH:    trying to emit a polymorphic cache\n");
 
     // Emit SetPropertyCache.
     MSetPropertyCache *ins = MSetPropertyCache::New(alloc(), obj, value, name, script()->strict(), barrier);
@@ -9627,6 +9663,8 @@ IonBuilder::setPropTryCache(bool *emitted, MDefinition *obj,
 
     if (!resumeAfter(ins))
         return false;
+
+    fprintf(stderr, "COACH:        success\n");
 
     *emitted = true;
     return true;
