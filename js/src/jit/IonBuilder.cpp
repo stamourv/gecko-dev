@@ -8268,11 +8268,11 @@ IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
                             types::HeapTypeSetKey *property)
 {
     if (!types)
-        fprintf(stderr, "COACH:    failure, no typeset\n");
+        fprintf(stderr, "COACH:        failure, no typeset\n");
     else if (types->unknownObject())
-        fprintf(stderr, "COACH:    failure, unknown object type\n");
+        fprintf(stderr, "COACH:        failure, unknown object type\n");
     else if (types->getObjectCount() != 1){
-        fprintf(stderr, "COACH:    failure, %d possible object types\n",
+        fprintf(stderr, "COACH:        failure, %d possible object types\n",
                 types->getObjectCount());
     }
 
@@ -8282,9 +8282,9 @@ IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
     types::TypeObjectKey *type = types->getObject(0);
 
     if (type->unknownProperties())
-        fprintf(stderr, "COACH:    failure, unknown properties\n");
+        fprintf(stderr, "COACH:        failure, unknown properties\n");
     if (type->singleton())
-        fprintf(stderr, "COACH:    failure, singleton\n"); // singletons are not guaranteed to have fields in fixed slots
+        fprintf(stderr, "COACH:        failure, singleton\n"); // singletons are not guaranteed to have fields in fixed slots
     
     if (type->unknownProperties() || type->singleton())
         return false;
@@ -8296,7 +8296,7 @@ IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
         property->maybeTypes()->definiteProperty() &&
         !property->nonData(constraints());
     if (!success)
-        fprintf(stderr, "COACH:    failure, property not in a fixed slot\n"); // tell user: maybe it's not an ownProperty? (I think that can cause failure here)
+        fprintf(stderr, "COACH:        failure, property not in a fixed slot\n"); // tell user: maybe it's not an ownProperty? (I think that can cause failure here)
     return success;
 }
 
@@ -8648,13 +8648,13 @@ IonBuilder::jsop_getprop(PropertyName *name)
 
     // Try to hardcode known constants.
     if (!getPropTryConstant(&emitted, obj, name, types) || emitted){
-        fprintf(stderr, "COACH:    success, known constant\n");
+        fprintf(stderr, "COACH:        success, known constant\n");
         return emitted;
     }
 
     // Try to emit loads from known binary data blocks
     if (!getPropTryTypedObject(&emitted, obj, name, types) || emitted){
-        fprintf(stderr, "COACH:    success, known binary data block\n");
+        fprintf(stderr, "COACH:        success, known binary data block\n");
         return emitted;
     }
 
@@ -8664,7 +8664,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
 
     // Try to inline a common property getter, or make a call.
     if (!getPropTryCommonGetter(&emitted, obj, name, types) || emitted){
-        fprintf(stderr, "COACH:    success, common getter\n");
+        fprintf(stderr, "COACH:        success, common getter\n");
         return emitted;
     }
 
@@ -8687,7 +8687,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
     if (!resumeAfter(call))
         return false;
 
-    fprintf(stderr, "COACH:    failure, falling back to a call\n");
+    fprintf(stderr, "COACH:        failure, falling back to a call\n");
 
     return pushTypeBarrier(call, types, BarrierKind::TypeSet);
 }
@@ -8838,7 +8838,7 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
 {
     JS_ASSERT(*emitted == false);
 
-    fprintf(stderr, "COACH: trying getprop with definite slot\n");
+    fprintf(stderr, "COACH:    trying getprop with definite slot\n");
 
     types::HeapTypeSetKey property;
     if (!getDefiniteSlot(obj->resultTypeSet(), name, &property))
@@ -8861,7 +8861,7 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
     if (!pushTypeBarrier(fixed, types, barrier))
         return false;
 
-    fprintf(stderr, "COACH:    success\n");
+    fprintf(stderr, "COACH:        success\n");
 
     *emitted = true;
     return true;
@@ -8966,7 +8966,7 @@ CanInlinePropertyOpShapes(const BaselineInspector::ShapeVector &shapes)
         // lastProperty, and calling Shape::search() on dictionary mode
         // shapes that aren't lastProperty is invalid.
         if (shapes[i]->inDictionary()){
-            fprintf(stderr, "COACH:    failure, shape in dictionary mode\n");
+            fprintf(stderr, "COACH:        failure, shape in dictionary mode\n");
             return false;
         }
     }
@@ -9007,10 +9007,10 @@ bool
 IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName *name,
                                    BarrierKind barrier, types::TemporaryTypeSet *types)
 {
-    fprintf(stderr, "COACH: trying getprop inline access\n");
+    fprintf(stderr, "COACH:    trying getprop inline access\n");
     JS_ASSERT(*emitted == false);
     if (obj->type() != MIRType_Object){
-        fprintf(stderr, "COACH:    failure, MIR type is not object: %s\n",
+        fprintf(stderr, "COACH:        failure, MIR type is not object: %s\n",
                 StringFromMIRType(obj->type()));
         return true;
     }
@@ -9020,7 +9020,7 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
         return false;
 
     if (shapes.empty()) {
-        fprintf(stderr, "COACH:    failure, no known shapes\n");
+        fprintf(stderr, "COACH:        failure, no known shapes\n");
         return true;
     }
     if (!CanInlinePropertyOpShapes(shapes))
@@ -9044,7 +9044,7 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
         if (!loadSlot(obj, shape, rvalType, barrier, types))
             return false;
 
-        fprintf(stderr, "COACH:    success, inlining monomorphic getprop\n");
+        fprintf(stderr, "COACH:        success, inlining monomorphic getprop\n");
 
         *emitted = true;
         return true;
@@ -9074,7 +9074,7 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
         if (!loadSlot(obj, propShapes[0], rvalType, barrier, types))
             return false;
 
-        fprintf(stderr, "COACH:    success, inlining polymorphic (really monomorphic) getprop\n");
+        fprintf(stderr, "COACH:        success, inlining polymorphic (really monomorphic) getprop\n");
 
         *emitted = true;
         return true;
@@ -9096,7 +9096,7 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
     if (!pushTypeBarrier(load, types, barrier))
         return false;
 
-    fprintf(stderr, "COACH:    success, inlining polymorphic getprop\n");
+    fprintf(stderr, "COACH:        success, inlining polymorphic getprop\n");
 
     *emitted = true;
     return true;
@@ -9108,18 +9108,18 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
 {
     JS_ASSERT(*emitted == false);
 
-    fprintf(stderr, "COACH: trying to emit a polymorphic cache\n");
+    fprintf(stderr, "COACH:    trying to emit a polymorphic cache\n");
 
     // The input value must either be an object, or we should have strong suspicions
     // that it can be safely unboxed to an object.
     if (obj->type() != MIRType_Object) {
         types::TemporaryTypeSet *types = obj->resultTypeSet();
         if (!types){
-            fprintf(stderr, "COACH:    failure, no type info\n");
+            fprintf(stderr, "COACH:        failure, no type info\n");
             return true;
         }
         if (!types->objectOrSentinel()){
-            fprintf(stderr, "COACH:    failure, input may not be an object\n");
+            fprintf(stderr, "COACH:        failure, input may not be an object\n");
             return true;
         }
     }
@@ -9172,7 +9172,7 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
     if (!pushTypeBarrier(load, types, barrier))
         return false;
 
-    fprintf(stderr, "COACH:    success\n");
+    fprintf(stderr, "COACH:        success\n");
 
     *emitted = true;
     return true;
