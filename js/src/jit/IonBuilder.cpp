@@ -8647,20 +8647,26 @@ IonBuilder::jsop_getprop(PropertyName *name)
     fprintf(stderr, "\n");
 
     // Try to hardcode known constants.
-    if (!getPropTryConstant(&emitted, obj, name, types) || emitted)
+    if (!getPropTryConstant(&emitted, obj, name, types) || emitted){
+        fprintf(stderr, "COACH:    success, known constant\n");
         return emitted;
+    }
 
     // Try to emit loads from known binary data blocks
-    if (!getPropTryTypedObject(&emitted, obj, name, types) || emitted)
+    if (!getPropTryTypedObject(&emitted, obj, name, types) || emitted){
+        fprintf(stderr, "COACH:    success, known binary data block\n");
         return emitted;
+    }
 
     // Try to emit loads from definite slots.
     if (!getPropTryDefiniteSlot(&emitted, obj, name, barrier, types) || emitted)
         return emitted;
 
     // Try to inline a common property getter, or make a call.
-    if (!getPropTryCommonGetter(&emitted, obj, name, types) || emitted)
+    if (!getPropTryCommonGetter(&emitted, obj, name, types) || emitted){
+        fprintf(stderr, "COACH:    success, common getter\n");
         return emitted;
+    }
 
     // Try to emit a monomorphic/polymorphic access based on baseline caches.
     if (!getPropTryInlineAccess(&emitted, obj, name, barrier, types) || emitted)
