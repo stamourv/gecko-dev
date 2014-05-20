@@ -8643,7 +8643,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
             script()->filename(), script()->lineno(),
             script()->id(), script()->pcToOffset(pc));
     fprintf(stderr, "COACH:    types:");
-    types->print();
+    if (types) types->print();
     fprintf(stderr, "\n");
 
     // Try to hardcode known constants.
