@@ -8689,7 +8689,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
     if (!resumeAfter(call))
         return false;
 
-    fprintf(stderr, "COACH:    trying to emit a call\nCOACH:        success\n");
+    fprintf(stderr, "COACH:    trying emiting a call\nCOACH:        success\n");
 
     return pushTypeBarrier(call, types, BarrierKind::TypeSet);
 }
@@ -8840,7 +8840,7 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
 {
     JS_ASSERT(*emitted == false);
 
-    fprintf(stderr, "COACH:    trying getprop with definite slot\n");
+    fprintf(stderr, "COACH:    trying definite slot\n");
 
     types::HeapTypeSetKey property;
     if (!getDefiniteSlot(obj->resultTypeSet(), name, &property))
@@ -9009,7 +9009,7 @@ bool
 IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName *name,
                                    BarrierKind barrier, types::TemporaryTypeSet *types)
 {
-    fprintf(stderr, "COACH:    trying getprop inline access\n");
+    fprintf(stderr, "COACH:    trying inline access\n");
     JS_ASSERT(*emitted == false);
     if (obj->type() != MIRType_Object){
         fprintf(stderr, "COACH:        failure, MIR type is not object: %s\n",
@@ -9108,7 +9108,7 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
 {
     JS_ASSERT(*emitted == false);
 
-    fprintf(stderr, "COACH:    trying to emit a polymorphic cache\n");
+    fprintf(stderr, "COACH:    trying emitting a polymorphic cache\n");
 
     // The input value must either be an object, or we should have strong suspicions
     // that it can be safely unboxed to an object.
@@ -9509,7 +9509,7 @@ IonBuilder::setPropTryDefiniteSlot(bool *emitted, MDefinition *obj,
 {
     JS_ASSERT(*emitted == false);
 
-    fprintf(stderr, "COACH:    trying setprop with definite slot\n");
+    fprintf(stderr, "COACH:    trying definite slot\n");
 
     if (barrier){
         fprintf(stderr, "COACH:        failure, would require a barrier\n"); // tell user: setting to a type that you haven't set to before, don't do that
@@ -9547,7 +9547,7 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
                                    MDefinition *value, bool barrier,
                                    types::TemporaryTypeSet *objTypes)
 {
-    fprintf(stderr, "COACH:    trying setprop inline access\n");
+    fprintf(stderr, "COACH:    trying inline access\n");
     JS_ASSERT(*emitted == false);
 
     if (barrier){
@@ -9650,7 +9650,7 @@ IonBuilder::setPropTryCache(bool *emitted, MDefinition *obj,
 {
     JS_ASSERT(*emitted == false);
 
-    fprintf(stderr, "COACH:    trying to emit a polymorphic cache\n");
+    fprintf(stderr, "COACH:    trying emitting a polymorphic cache\n");
 
     // Emit SetPropertyCache.
     MSetPropertyCache *ins = MSetPropertyCache::New(alloc(), obj, value, name, script()->strict(), barrier);
