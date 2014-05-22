@@ -8639,8 +8639,10 @@ IonBuilder::jsop_getprop(PropertyName *name)
         return resumeAfter(call) && pushTypeBarrier(call, types, BarrierKind::TypeSet);
     }
 
-    fprintf(stderr, "COACH: optimizing getprop: %s:%d #%u:%05u\n",
-            script()->filename(), script()->lineno(),
+    unsigned column = 0;
+    unsigned line = PCToLineNumber(script(), pc, &column);
+    fprintf(stderr, "COACH: optimizing getprop: %s:%d:%u #%u:%05u\n",
+            script()->filename(), line, column,
             script()->id(), script()->pcToOffset(pc));
     fprintf(stderr, "COACH:    types:");
     if (obj->resultTypeSet()) obj->resultTypeSet()->print();
@@ -9277,8 +9279,10 @@ IonBuilder::jsop_setprop(PropertyName *name)
         return resumeAfter(ins);
     }
 
-    fprintf(stderr, "COACH: optimizing setprop: %s:%d #%u:%05u\n",
-            script()->filename(), script()->lineno(),
+    unsigned column = 0;
+    unsigned line = PCToLineNumber(script(), pc, &column);
+    fprintf(stderr, "COACH: optimizing setprop: %s:%d:%u #%u:%05u\n",
+            script()->filename(), line, column,
             script()->id(), script()->pcToOffset(pc));
     fprintf(stderr, "COACH:    obj types:");
     if(obj->resultTypeSet()) obj->resultTypeSet()->print();
