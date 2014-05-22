@@ -126,11 +126,13 @@ BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
         if (stub->toGetProp_Fallback()->hadUnoptimizableAccess()){
             fprintf(stderr, "COACH:        failure, fallback had unoptimizable access\n"); // TODO under what circumstances does this happen?
             shapes.clear();
+            return true;
         }
     } else {
         if (stub->toSetProp_Fallback()->hadUnoptimizableAccess()){
             fprintf(stderr, "COACH:        failure, fallback had unoptimizable access\n"); // TODO under what circumstances does this happen?
             shapes.clear();
+            return true;
         }
     }
 
