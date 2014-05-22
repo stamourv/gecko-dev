@@ -8648,13 +8648,13 @@ IonBuilder::jsop_getprop(PropertyName *name)
 
     // Try to hardcode known constants.
     if (!getPropTryConstant(&emitted, obj, name, types) || emitted){
-        fprintf(stderr, "COACH:        success, known constant\n");
+        fprintf(stderr, "COACH:    trying known constant\nCOACH:        success\n");
         return emitted;
     }
 
     // Try to emit loads from known binary data blocks
     if (!getPropTryTypedObject(&emitted, obj, name, types) || emitted){
-        fprintf(stderr, "COACH:        success, known binary data block\n");
+        fprintf(stderr, "COACH:    trying known binary data block\nCOACH:        success\n");
         return emitted;
     }
 
@@ -8664,7 +8664,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
 
     // Try to inline a common property getter, or make a call.
     if (!getPropTryCommonGetter(&emitted, obj, name, types) || emitted){
-        fprintf(stderr, "COACH:        success, common getter\n");
+        fprintf(stderr, "COACH:    trying common getter\nCOACH:        success\n");
         return emitted;
     }
 
@@ -8687,7 +8687,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
     if (!resumeAfter(call))
         return false;
 
-    fprintf(stderr, "COACH:        failure, falling back to a call\n");
+    fprintf(stderr, "COACH:    trying to emit a call\nCOACH:        success\n");
 
     return pushTypeBarrier(call, types, BarrierKind::TypeSet);
 }
@@ -9292,7 +9292,7 @@ IonBuilder::jsop_setprop(PropertyName *name)
 
     // Try to inline a common property setter, or make a call.
     if (!setPropTryCommonSetter(&emitted, obj, name, value) || emitted){
-        fprintf(stderr, "COACH:        success, common setter\n");
+        fprintf(stderr, "COACH:    trying common setter\nCOACH:        success\n");
         return emitted;
     }
 
@@ -9302,7 +9302,7 @@ IonBuilder::jsop_setprop(PropertyName *name)
 
     // Try to emit stores to known binary data blocks
     if (!setPropTryTypedObject(&emitted, obj, name, value) || emitted){
-        fprintf(stderr, "COACH:        success, known binary data block\n");
+        fprintf(stderr, "COACH:    trying known binary data block\nCOACH:        success\n");
         return emitted;
     }
 
