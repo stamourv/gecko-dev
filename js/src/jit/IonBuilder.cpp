@@ -8641,8 +8641,10 @@ IonBuilder::jsop_getprop(PropertyName *name)
 
     unsigned column = 0;
     unsigned line = PCToLineNumber(script(), pc, &column);
-    fprintf(stderr, "COACH: optimizing getprop: %s:%d:%u #%u:%05u\n",
-            script()->filename(), line, column,
+    char buf[100]; // magic limit copied from types::typeIdStringImpl
+    PutEscapedString(buf, 100, JSID_TO_FLAT_STRING(NameToId(name)), 0);
+    fprintf(stderr, "COACH: optimizing getprop %s: %s:%d:%u #%u:%05u\n",
+            buf, script()->filename(), line, column,
             script()->id(), script()->pcToOffset(pc));
     fprintf(stderr, "COACH:    types:");
     if (obj->resultTypeSet()) obj->resultTypeSet()->print();
@@ -9281,8 +9283,10 @@ IonBuilder::jsop_setprop(PropertyName *name)
 
     unsigned column = 0;
     unsigned line = PCToLineNumber(script(), pc, &column);
-    fprintf(stderr, "COACH: optimizing setprop: %s:%d:%u #%u:%05u\n",
-            script()->filename(), line, column,
+    char buf[100]; // magic limit copied from types::typeIdStringImpl
+    PutEscapedString(buf, 100, JSID_TO_FLAT_STRING(NameToId(name)), 0);
+    fprintf(stderr, "COACH: optimizing setprop %s: %s:%d:%u #%u:%05u\n",
+            buf, script()->filename(), line, column,
             script()->id(), script()->pcToOffset(pc));
     fprintf(stderr, "COACH:    obj types:");
     types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
