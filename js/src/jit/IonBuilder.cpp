@@ -9295,7 +9295,10 @@ IonBuilder::jsop_setprop(PropertyName *name)
         object->property(id).maybeTypes()->print();
     }
     fprintf(stderr, "\nCOACH:    value types:");
-    if(value->resultTypeSet()) value->resultTypeSet()->print();
+    if(value->resultTypeSet())
+        value->resultTypeSet()->print();
+    // If we don't have TI type info, report the MIR type instead.
+    else fprintf(stderr, " %s", StringFromMIRType(value->type()));
     fprintf(stderr, "\n");
 
     // Add post barrier if needed.
