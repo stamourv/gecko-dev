@@ -101,7 +101,10 @@ BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
         } else if (stub->isSetProp_Native()) {
             shape = stub->toSetProp_Native()->shape();
         } else {
-            fprintf(stderr, "COACH:        failure, property access not native\n");
+            if (stub->isGetProp_NativePrototype())
+                fprintf(stderr, "COACH:        failure, access needs to go through the prototype\n");
+            else
+                fprintf(stderr, "COACH:        failure, property access not native\n");
             shapes.clear();
             return true;
         }
