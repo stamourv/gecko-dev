@@ -9285,7 +9285,15 @@ IonBuilder::jsop_setprop(PropertyName *name)
             script()->filename(), line, column,
             script()->id(), script()->pcToOffset(pc));
     fprintf(stderr, "COACH:    obj types:");
-    if(obj->resultTypeSet()) obj->resultTypeSet()->print();
+    types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
+    if(objTypes) objTypes->print();
+    jsid id = name ? NameToId(name) : JSID_VOID;
+    fprintf(stderr, "\nCOACH:    property types:");
+    for (size_t i = 0; i < objTypes->getObjectCount(); i++){
+        // TODO print a separator between each
+        types::TypeObjectKey *object = objTypes->getObject(i);
+        object->property(id).maybeTypes()->print();
+    }
     fprintf(stderr, "\nCOACH:    value types:");
     if(value->resultTypeSet()) value->resultTypeSet()->print();
     fprintf(stderr, "\n");
@@ -9300,7 +9308,6 @@ IonBuilder::jsop_setprop(PropertyName *name)
         return emitted;
     }
 
-    types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
     bool barrier = PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current, &obj, name, &value,
                                                  /* canModify = */ true);
 
