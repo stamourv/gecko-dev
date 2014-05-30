@@ -9293,10 +9293,13 @@ IonBuilder::jsop_setprop(PropertyName *name)
     if(objTypes) objTypes->print();
     jsid id = name ? NameToId(name) : JSID_VOID;
     fprintf(stderr, "\nCOACH:    property types:");
-    for (size_t i = 0; i < objTypes->getObjectCount(); i++){
+    for (size_t i = 0;
+         i < ((objTypes && !objTypes->unknownObject()) ? objTypes->getObjectCount() : 0);
+         i++){
         // TODO print a separator between each
         types::TypeObjectKey *object = objTypes->getObject(i);
-        object->property(id).maybeTypes()->print();
+        if (!object->unknownProperties() && object->property(id).maybeTypes())
+            object->property(id).maybeTypes()->print();
     }
     fprintf(stderr, "\nCOACH:    value types:");
     if(value->resultTypeSet())
