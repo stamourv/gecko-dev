@@ -903,6 +903,23 @@ IonBuilder::buildInline(IonBuilder *callerBuilder, MResumePoint *callerResumePoi
     if (!traverseBytecode())
         return false;
 
+    // Copy our optimization info to our caller's IonBuilder.
+    // By now, our optimization info includes our callees'.
+    OptInfo *callerOptInfo = callerBuilder->optInfo_;
+    for (OptInfo::Enum e(*optInfo_); !e.empty(); e.popFront()) {
+        jsbytecode *pc = e.front().key();
+        OptInfoEntry *info = e.front().value();
+        OptInfo::AddPtr p = callerOptInfo->lookupForAdd(pc);
+        if (p) {
+            // If there's already info for one of our instructions (we, or one
+            // of our callees, were inlined in our caller already), add to the
+            // existing vector.
+            p->value()->appendAll(*info);
+        } else {
+            callerOptInfo->add(p, pc, info);
+        }
+    }
+
     return true;
 }
 
