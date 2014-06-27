@@ -10,6 +10,7 @@
 #include "jit/BaselineIC.h"
 #include "jit/BaselineJIT.h"
 #include "jit/MIR.h"
+#include "jit/IonBuilder.h"
 
 namespace js {
 namespace jit {
@@ -93,7 +94,7 @@ class BaselineInspector
 
   public:
     typedef Vector<Shape *, 4, IonAllocPolicy> ShapeVector;
-    bool maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes);
+    bool maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes, IonBuilder *builder);
 
     SetElemICInspector setElemICInspector(jsbytecode *pc) {
         return makeICInspector<SetElemICInspector>(pc, ICStub::SetElem_Fallback);

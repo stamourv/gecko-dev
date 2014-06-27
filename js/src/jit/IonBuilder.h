@@ -29,6 +29,29 @@ class BaselineFrameInspector;
 BaselineFrameInspector *
 NewBaselineFrameInspector(TempAllocator *temp, BaselineFrame *frame, CompileInfo *info);
 
+/*
+ * Records information about optimization successes and failures.
+ * Keep one entry per instruction. Each entry is a vector of strings, one
+ * string per optimization event.
+ * An optimization event is one of:
+ *  - we're starting to compile an operation, and log it and its location
+ *  - we're attempting to apply a specific implementation strategy
+ *    (e.g. getprop with definite slot)
+ *  - we succeeded at applying an implementation strategy
+ *  - we failed, and log the reason why
+ * These strings eventually get emitted as profile events after Ion building.
+ * Eventually, this information should be encoded in proper data structures
+ * (e.g. using enums for implementation strategies, failure reasons, etc.)
+ * instead of strings, and strings should only be allocated when emitting
+ * profile events (and only in profiling mode).
+*/
+typedef Vector<const char *, 0, IonAllocPolicy> OptInfoEntry;
+typedef HashMap<jsbytecode *,
+                OptInfoEntry *,
+                DefaultHasher<jsbytecode *>,
+                IonAllocPolicy>
+        OptInfo;
+
 class IonBuilder : public MIRGenerator
 {
     enum ControlStatus {
@@ -937,6 +960,27 @@ class IonBuilder : public MIRGenerator
 
     // If this is an inline builder, the call info for the builder.
     const CallInfo *inlineCallInfo_;
+
+private:
+    // one element per getprop/setprop operation
+    OptInfo *optInfo_;
+    void addOptInfoLocation(const char* log, PropertyName *name);
+    void addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types);
+public:
+    OptInfo *optInfo() { return optInfo_; }
+    void addOptInfo(const char* log)
+    {
+        OptInfo::Ptr p = optInfo_->lookup(pc);
+        OptInfoEntry *v;
+        // If any of these operations fail, no big deal, we just lose some info.
+        if (p) { // we already have logs for that operation, append
+            v = p->value();
+        } else { // no logs for that operation, create a new vector
+            v = new OptInfoEntry(*alloc_);
+            if (!optInfo_->put(pc, v)) return; // failure, give up
+        }
+        v->append(log);
+    }
 };
 
 class CallInfo

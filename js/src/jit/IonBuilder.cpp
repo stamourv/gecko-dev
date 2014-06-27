@@ -30,6 +30,8 @@
 #include "jit/CompileInfo-inl.h"
 #include "jit/ExecutionMode-inl.h"
 
+#include "jsprf.h"
+
 using namespace js;
 using namespace js::jit;
 
@@ -145,6 +147,8 @@ IonBuilder::IonBuilder(JSContext *analysisContext, CompileCompartment *comp,
     script_ = info->script();
     pc = info->startPC();
     abortReason_ = AbortReason_Disable;
+    optInfo_ = new OptInfo(*temp);
+    optInfo_->init();
 
     JS_ASSERT(script()->hasBaselineScript() == (info->executionMode() != ArgumentsUsageAnalysis));
     JS_ASSERT(!!analysisContext == (info->executionMode() == DefinitePropertiesAnalysis));
@@ -8352,19 +8356,44 @@ bool
 IonBuilder::getDefiniteSlot(types::TemporaryTypeSet *types, PropertyName *name,
                             types::HeapTypeSetKey *property)
 {
-    if (!types || types->unknownObject() || types->getObjectCount() != 1)
+    if (!types) {
+        addOptInfo("failure, no typeset");
         return false;
+    }
+    else if (types->unknownObject()) {
+        addOptInfo("failure, unknown object type");
+        return false;
+    }
+    else if (types->getObjectCount() != 1) {
+        // plenty of room for object count
+        char *log = (char *) alloc().allocateArray<sizeof(char)>(40);
+        JS_snprintf(log, 40, "failure, %d possible object types", types->getObjectCount());
+        addOptInfo(log);
+        return false;
+    }
 
     types::TypeObjectKey *type = types->getObject(0);
-    if (type->unknownProperties() || type->singleton())
+
+    if (type->unknownProperties()) {
+        addOptInfo("failure, unknown properties");
         return false;
+    }
+    if (type->singleton()) {
+        addOptInfo("failure, singleton");
+        return false;
+    }
 
     jsid id = NameToId(name);
 
     *property = type->property(id);
-    return property->maybeTypes() &&
-           property->maybeTypes()->definiteProperty() &&
-           !property->nonData(constraints());
+
+    bool success = property->maybeTypes() &&
+        property->maybeTypes()->definiteProperty() &&
+        !property->nonData(constraints());
+    if (!success)
+        addOptInfo("failure, property not in a fixed slot");
+
+    return success;
 }
 
 bool
@@ -8670,6 +8699,33 @@ IonBuilder::storeSlot(MDefinition *obj, Shape *shape, MDefinition *value, bool n
     return storeSlot(obj, shape->slot(), shape->numFixedSlots(), value, needsBarrier, slotType);
 }
 
+void
+IonBuilder::addOptInfoLocation(const char* op, PropertyName *name)
+{
+    jsid id = name ? NameToId(name) : JSID_VOID;
+    unsigned column = 0;
+    unsigned line = PCToLineNumber(script(), pc, &column);
+    size_t bufsize = 200; // should be enough
+    char *loc = js_pod_malloc<char>(bufsize);
+    JS_snprintf(loc, bufsize,
+                "optimizing %s %hs %s:%d:%d #%u:%05u",
+                op, JSID_TO_FLAT_STRING(id)->chars(),
+                script()->filename(), line, column, script()->id(), script()->pcToOffset(pc));
+    addOptInfo(const_cast<const char *>(loc));
+}   
+
+void
+IonBuilder::addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types)
+{
+    int32_t len = 200; // should be enough to print a typeset
+    char *str = (char *) alloc().allocateArray<sizeof(char)>(len);
+    strcpy(str, prefix);
+    if(types) {
+        types->toString(str+strlen(prefix), len-strlen(prefix));
+    }
+    addOptInfo(str);
+}
+
 bool
 IonBuilder::jsop_getprop(PropertyName *name)
 {
@@ -8714,21 +8770,37 @@ IonBuilder::jsop_getprop(PropertyName *name)
         return resumeAfter(call) && pushTypeBarrier(call, types, BarrierKind::TypeSet);
     }
 
+    addOptInfoLocation("getprop", name);
+
+    types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
+    addOptInfoTypeset("obj types:", objTypes);
+
     // Try to hardcode known constants.
-    if (!getPropTryConstant(&emitted, obj, name, types) || emitted)
+    if (!getPropTryConstant(&emitted, obj, name, types) || emitted) {
+        // not reporting failures for the next few since these strategies can't
+        // apply in most cases, by design, so failures are not an issue
+        addOptInfo("trying known constant");
+        addOptInfo("success");
         return emitted;
+    }
 
     // Try to emit loads from known binary data blocks
-    if (!getPropTryTypedObject(&emitted, obj, name, types) || emitted)
+    if (!getPropTryTypedObject(&emitted, obj, name, types) || emitted) {
+        addOptInfo("trying known binary data block");
+        addOptInfo("success");
         return emitted;
+    }
 
     // Try to emit loads from definite slots.
     if (!getPropTryDefiniteSlot(&emitted, obj, name, barrier, types) || emitted)
         return emitted;
 
     // Try to inline a common property getter, or make a call.
-    if (!getPropTryCommonGetter(&emitted, obj, name, types) || emitted)
+    if (!getPropTryCommonGetter(&emitted, obj, name, types) || emitted) {
+        addOptInfo("trying common getter");
+        addOptInfo("success");
         return emitted;
+    }
 
     // Try to emit a monomorphic/polymorphic access based on baseline caches.
     if (!getPropTryInlineAccess(&emitted, obj, name, barrier, types) || emitted)
@@ -8748,6 +8820,9 @@ IonBuilder::jsop_getprop(PropertyName *name)
     current->push(call);
     if (!resumeAfter(call))
         return false;
+
+    addOptInfo("trying emiting a call");
+    addOptInfo("success");
 
     return pushTypeBarrier(call, types, BarrierKind::TypeSet);
 }
@@ -8953,6 +9028,9 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
                                    BarrierKind barrier, types::TemporaryTypeSet *types)
 {
     JS_ASSERT(*emitted == false);
+
+    addOptInfo("trying definite slot");
+
     types::HeapTypeSetKey property;
     if (!getDefiniteSlot(obj->resultTypeSet(), name, &property))
         return true;
@@ -8973,6 +9051,8 @@ IonBuilder::getPropTryDefiniteSlot(bool *emitted, MDefinition *obj, PropertyName
 
     if (!pushTypeBarrier(fixed, types, barrier))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
@@ -9082,15 +9162,17 @@ IonBuilder::getPropTryCommonGetter(bool *emitted, MDefinition *obj, PropertyName
 }
 
 static bool
-CanInlinePropertyOpShapes(const BaselineInspector::ShapeVector &shapes)
+CanInlinePropertyOpShapes(const BaselineInspector::ShapeVector &shapes, IonBuilder *builder)
 {
     for (size_t i = 0; i < shapes.length(); i++) {
         // We inline the property access as long as the shape is not in
         // dictionary mode. We cannot be sure that the shape is still a
         // lastProperty, and calling Shape::search() on dictionary mode
         // shapes that aren't lastProperty is invalid.
-        if (shapes[i]->inDictionary())
+        if (shapes[i]->inDictionary()) {
+            builder->addOptInfo("failure, shape in dictionary mode");
             return false;
+        }
     }
 
     return true;
@@ -9130,14 +9212,23 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
                                    BarrierKind barrier, types::TemporaryTypeSet *types)
 {
     JS_ASSERT(*emitted == false);
-    if (obj->type() != MIRType_Object)
+
+    addOptInfo("trying inline access");
+
+    if (obj->type() != MIRType_Object){
+        // plenty of room for MIR type
+        char *log = (char *) alloc().allocateArray<sizeof(char)>(60);
+        JS_snprintf(log, 60, "failure, MIR type is not object: %s",
+                    StringFromMIRType(obj->type()));
+        addOptInfo(log);
         return true;
+    }
 
     BaselineInspector::ShapeVector shapes(alloc());
-    if (!inspector->maybeShapesForPropertyOp(pc, shapes))
+    if (!inspector->maybeShapesForPropertyOp(pc, shapes, this))
         return false;
 
-    if (shapes.empty() || !CanInlinePropertyOpShapes(shapes))
+    if (shapes.empty() || !CanInlinePropertyOpShapes(shapes, this))
         return true;
 
     MIRType rvalType = types->getKnownMIRType();
@@ -9157,6 +9248,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
 
         if (!loadSlot(obj, shape, rvalType, barrier, types))
             return false;
+
+        addOptInfo("success, inlining monomorphic getprop");
 
         *emitted = true;
         return true;
@@ -9186,6 +9279,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
         if (!loadSlot(obj, propShapes[0], rvalType, barrier, types))
             return false;
 
+        addOptInfo("success, inlining polymorphic (really monomorphic) getprop");
+
         *emitted = true;
         return true;
     }
@@ -9206,6 +9301,8 @@ IonBuilder::getPropTryInlineAccess(bool *emitted, MDefinition *obj, PropertyName
     if (!pushTypeBarrier(load, types, barrier))
         return false;
 
+    addOptInfo("success, inlining polymorphic getprop");
+
     *emitted = true;
     return true;
 }
@@ -9216,12 +9313,20 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
 {
     JS_ASSERT(*emitted == false);
 
+    addOptInfo("trying emitting a polymorphic cache");
+
     // The input value must either be an object, or we should have strong suspicions
     // that it can be safely unboxed to an object.
     if (obj->type() != MIRType_Object) {
         types::TemporaryTypeSet *types = obj->resultTypeSet();
-        if (!types || !types->objectOrSentinel())
+        if (!types) {
+            addOptInfo("failure, no type info");
             return true;
+        }
+        if (!types->objectOrSentinel()) {
+            addOptInfo("failure, input may not be an object");
+            return true;
+        }
     }
 
     // Since getters have no guaranteed return values, we must barrier in order to be
@@ -9284,6 +9389,8 @@ IonBuilder::getPropTryCache(bool *emitted, MDefinition *obj, PropertyName *name,
 
     if (!pushTypeBarrier(load, types, barrier))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
@@ -9390,21 +9497,67 @@ IonBuilder::jsop_setprop(PropertyName *name)
         return resumeAfter(ins);
     }
 
+    addOptInfoLocation("setprop", name);
+
+
+    types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
+    addOptInfoTypeset("obj types:", objTypes);
+
+    int32_t typeLen = 200; // should be enough
+    jsid id = name ? NameToId(name) : JSID_VOID;
+    char *propTypeStr = (char *) alloc().allocateArray<sizeof(char)>(typeLen);
+    char *propPrefix = "property types:";
+    strcpy(propTypeStr, propPrefix);
+    char *propCursor = propTypeStr + strlen(propPrefix);
+    int32_t propLen = typeLen - strlen(propPrefix);
+    for (size_t i = 0;
+         i < ((objTypes && !objTypes->unknownObject()) ? objTypes->getObjectCount() : 0);
+         i++) {
+        types::TypeObjectKey *object = objTypes->getObject(i);
+        if (object && !object->unknownProperties() && object->property(id).maybeTypes()) {
+            // TODO bleh n^2
+            // toString stops printing if it reaches the end of the buffer,
+            // so we don't need to check here
+            object->property(id).maybeTypes()->toString(propCursor, propLen);
+            strcat(propTypeStr, ",");
+            propCursor = propTypeStr + strlen(propTypeStr) + 1;
+            propLen = typeLen - strlen(propTypeStr) - 1;
+        }
+    }
+    addOptInfo(propTypeStr);
+
+    types::TemporaryTypeSet *valueTypes = value->resultTypeSet();
+    char *valuePrefix = "value types:";
+    if (valueTypes)
+        addOptInfoTypeset(valuePrefix, valueTypes);
+    else { // If we don't have TI type info, report the MIR type instead.
+        char *valueStr = (char *) alloc().allocateArray<sizeof(char)>(typeLen);
+        JS_snprintf(valueStr, typeLen, "%s %s", valuePrefix, StringFromMIRType(value->type()));
+        addOptInfo(valueStr);
+    }
+    
     // Add post barrier if needed.
     if (NeedsPostBarrier(info(), value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
     // Try to inline a common property setter, or make a call.
-    if (!setPropTryCommonSetter(&emitted, obj, name, value) || emitted)
+    if (!setPropTryCommonSetter(&emitted, obj, name, value) || emitted) {
+        // not reporting failures for the next few since these strategies can't
+        // apply in most cases, by design, so failures are not an issue
+        addOptInfo("trying common setter");
+        addOptInfo("success");
         return emitted;
+    }
 
-    types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
     bool barrier = PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current, &obj, name, &value,
                                                  /* canModify = */ true);
 
     // Try to emit stores to known binary data blocks
-    if (!setPropTryTypedObject(&emitted, obj, name, value) || emitted)
+    if (!setPropTryTypedObject(&emitted, obj, name, value) || emitted) {
+        addOptInfo("trying known binary data block");
+        addOptInfo("success");
         return emitted;
+    }
 
     // Do not emit optimized stores to slots that may be constant.
     if (objTypes && !objTypes->propertyMightBeConstant(constraints(), NameToId(name))) {
@@ -9594,15 +9747,21 @@ IonBuilder::setPropTryDefiniteSlot(bool *emitted, MDefinition *obj,
 {
     JS_ASSERT(*emitted == false);
 
-    if (barrier)
+    addOptInfo("trying definite slot");
+
+    if (barrier){
+        addOptInfo("failure, would require a barrier"); // tell user: setting to a type that you haven't set to before, don't do that
         return true;
+    }
 
     types::HeapTypeSetKey property;
     if (!getDefiniteSlot(obj->resultTypeSet(), name, &property))
         return true;
 
-    if (property.nonWritable(constraints()))
+    if (property.nonWritable(constraints())) {
+        addOptInfo("failure, object non writable");
         return true;
+    }
 
     MStoreFixedSlot *fixed = MStoreFixedSlot::New(alloc(), obj, property.maybeTypes()->definiteSlot(), value);
     current->add(fixed);
@@ -9613,6 +9772,8 @@ IonBuilder::setPropTryDefiniteSlot(bool *emitted, MDefinition *obj,
 
     if (!resumeAfter(fixed))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
@@ -9626,17 +9787,21 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
 {
     JS_ASSERT(*emitted == false);
 
-    if (barrier)
+    addOptInfo("trying inline access");
+
+    if (barrier) {
+        addOptInfo("failure, would require a barrier");
         return true;
+    }
 
     BaselineInspector::ShapeVector shapes(alloc());
-    if (!inspector->maybeShapesForPropertyOp(pc, shapes))
+    if (!inspector->maybeShapesForPropertyOp(pc, shapes, this))
         return false;
 
     if (shapes.empty())
         return true;
 
-    if (!CanInlinePropertyOpShapes(shapes))
+    if (!CanInlinePropertyOpShapes(shapes, this))
         return true;
 
     if (shapes.length() == 1) {
@@ -9655,6 +9820,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
         bool needsBarrier = objTypes->propertyNeedsBarrier(constraints(), NameToId(name));
         if (!storeSlot(obj, shape, value, needsBarrier))
             return false;
+
+        addOptInfo("success, inlining monomorphic setprop");
 
         *emitted = true;
         return true;
@@ -9685,6 +9852,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
         if (!storeSlot(obj, propShapes[0], value, needsBarrier))
             return false;
 
+        addOptInfo("success, inlining polymorphic (really monomorphic) setprop");
+
         *emitted = true;
         return true;
     }
@@ -9707,6 +9876,8 @@ IonBuilder::setPropTryInlineAccess(bool *emitted, MDefinition *obj,
     if (!resumeAfter(ins))
         return false;
 
+    addOptInfo("success, inlining polymorphic setprop");
+
     *emitted = true;
     return true;
 }
@@ -9717,6 +9888,8 @@ IonBuilder::setPropTryCache(bool *emitted, MDefinition *obj,
                             bool barrier, types::TemporaryTypeSet *objTypes)
 {
     JS_ASSERT(*emitted == false);
+
+    addOptInfo("trying emitting a polymorphic cache");
 
     // Emit SetPropertyCache.
     MSetPropertyCache *ins = MSetPropertyCache::New(alloc(), obj, value, name, script()->strict(), barrier);
@@ -9729,6 +9902,8 @@ IonBuilder::setPropTryCache(bool *emitted, MDefinition *obj,
 
     if (!resumeAfter(ins))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;

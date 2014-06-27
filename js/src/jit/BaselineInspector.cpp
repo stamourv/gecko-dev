@@ -5,10 +5,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "jit/BaselineInspector.h"
+#include "jit/IonBuilder.h"
 
 #include "mozilla/DebugOnly.h"
 
 #include "jit/BaselineIC.h"
+
+#include "jsprf.h"
 
 using namespace js;
 using namespace js::jit;
@@ -80,7 +83,7 @@ SetElemICInspector::sawTypedArrayWrite() const
 }
 
 bool
-BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
+BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes, IonBuilder *builder)
 {
     // Return a list of shapes seen by the baseline IC for the current op.
     // An empty list indicates no shapes are known, or there was an uncacheable
@@ -101,6 +104,12 @@ BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
         } else if (stub->isSetProp_Native()) {
             shape = stub->toSetProp_Native()->shape();
         } else {
+            if (stub->isGetProp_NativePrototype())
+                builder->addOptInfo("failure, access needs to go through the prototype");
+            else if (stub->isSetProp_NativeAdd())
+                builder->addOptInfo("failure, needs to add field");
+            else
+                builder->addOptInfo("failure, property access not native");
             shapes.clear();
             return true;
         }
@@ -122,16 +131,30 @@ BaselineInspector::maybeShapesForPropertyOp(jsbytecode *pc, ShapeVector &shapes)
     }
 
     if (stub->isGetProp_Fallback()) {
-        if (stub->toGetProp_Fallback()->hadUnoptimizableAccess())
+        if (stub->toGetProp_Fallback()->hadUnoptimizableAccess()) {
+            builder->addOptInfo("failure, fallback had unoptimizable access");
             shapes.clear();
+            return true;
+        }
     } else {
-        if (stub->toSetProp_Fallback()->hadUnoptimizableAccess())
+        if (stub->toSetProp_Fallback()->hadUnoptimizableAccess()) {
+            builder->addOptInfo("failure, fallback had unoptimizable access");
             shapes.clear();
+            return true;
+        }
     }
 
     // Don't inline if there are more than 5 shapes.
-    if (shapes.length() > 5)
+    size_t nShapes = shapes.length();
+    if (nShapes > 5){
+        // plenty of room for object count
+        char *log = (char *) builder->alloc().allocateArray<sizeof(char)>(40);
+        JS_snprintf(log, 40, "failure, %d possible shapes, 5 max", nShapes);
+        builder->addOptInfo(log);
         shapes.clear();
+    } else if (nShapes == 0){
+        builder->addOptInfo("failure, no known shapes");
+    }
 
     return true;
 }
