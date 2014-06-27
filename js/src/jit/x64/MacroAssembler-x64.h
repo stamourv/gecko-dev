@@ -597,6 +597,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     void mulBy3(const Register &src, const Register &dest) {
         lea(Operand(src, src, TimesTwo), dest);
     }
+    void mulBy5(const Register &src, const Register &dest) {
+        lea(Operand(src, src, TimesFour), dest);
+    }
 
     void branch32(Condition cond, AbsoluteAddress lhs, Imm32 rhs, Label *label) {
         if (X86Assembler::isAddressImmediate(lhs.addr)) {

@@ -1167,6 +1167,11 @@ public:
         as_addu(dest, src, src);
         as_addu(dest, dest, src);
     }
+    void mulBy5(const Register &src, const Register &dest) {
+        as_addu(dest, src, src);
+        as_addu(dest, dest, dest);
+        as_addu(dest, dest, src);
+    }
 
     void breakpoint();
 

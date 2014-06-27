@@ -1444,6 +1444,9 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
     void mulBy3(const Register &src, const Register &dest) {
         as_add(dest, src, lsl(src, 1));
     }
+    void mulBy5(const Register &src, const Register &dest) {
+        as_add(dest, src, lsl(src, 2));
+    }
 
     void setStackArg(Register reg, uint32_t arg);
 
