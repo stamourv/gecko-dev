@@ -568,54 +568,86 @@ ConstraintTypeSet::addType(ExclusiveContext *cxArg, Type type)
     }
 }
 
-void
-TypeSet::print()
+static void addToString(char *str, int32_t *len, const char *msg) {
+    // TODO bleh, n^2
+    if (*len > 0) {
+        strncat(str, msg, *len);
+        *len -= strlen(msg);
+    }    
+}
+
+bool // true if printed everything, false if we had to truncate
+TypeSet::toString(char *str, int32_t len)
 {
-    if (flags & TYPE_FLAG_NON_DATA_PROPERTY)
-        fprintf(stderr, " [non-data]");
+    str[0] = 0; // so that strcat finds an end to append to
+
+    if (flags & TYPE_FLAG_NON_DATA_PROPERTY) 
+        addToString(str, &len, " [non-data]");
 
     if (flags & TYPE_FLAG_NON_WRITABLE_PROPERTY)
-        fprintf(stderr, " [non-writable]");
+        addToString(str, &len, " [non-writable]");
 
-    if (definiteProperty())
-        fprintf(stderr, " [definite:%d]", definiteSlot());
+    if (definiteProperty()) {
+        char *tmp = js_pod_malloc<char>(30); // should be enough
+        JS_snprintf(tmp, 30, " [definite:%d]", definiteSlot());
+        addToString(str, &len, tmp);
+        js_free(tmp);
+    }
 
     if (baseFlags() == 0 && !baseObjectCount()) {
-        fprintf(stderr, " missing");
-        return;
+        addToString(str, &len, " missing");
+        return len > 0;
     }
 
     if (flags & TYPE_FLAG_UNKNOWN)
-        fprintf(stderr, " unknown");
+        addToString(str, &len, " unknown");
     if (flags & TYPE_FLAG_ANYOBJECT)
-        fprintf(stderr, " object");
+        addToString(str, &len, " object");
 
     if (flags & TYPE_FLAG_UNDEFINED)
-        fprintf(stderr, " void");
+        addToString(str, &len, " void");
     if (flags & TYPE_FLAG_NULL)
-        fprintf(stderr, " null");
+        addToString(str, &len, " null");
     if (flags & TYPE_FLAG_BOOLEAN)
-        fprintf(stderr, " bool");
+        addToString(str, &len, " bool");
     if (flags & TYPE_FLAG_INT32)
-        fprintf(stderr, " int");
+        addToString(str, &len, " int");
     if (flags & TYPE_FLAG_DOUBLE)
-        fprintf(stderr, " float");
+        addToString(str, &len, " float");
     if (flags & TYPE_FLAG_STRING)
-        fprintf(stderr, " string");
+        addToString(str, &len, " string");
     if (flags & TYPE_FLAG_LAZYARGS)
-        fprintf(stderr, " lazyargs");
+        addToString(str, &len, " lazyargs");
 
     uint32_t objectCount = baseObjectCount();
     if (objectCount) {
-        fprintf(stderr, " object[%u]", objectCount);
+        size_t tmpLen = 30;
+        char *tmp = js_pod_malloc<char>(tmpLen); // should be enough
+        JS_snprintf(tmp, tmpLen, " object[%u]", objectCount);
+        addToString(str, &len, tmp);
 
         unsigned count = getObjectCount();
         for (unsigned i = 0; i < count; i++) {
             TypeObjectKey *object = getObject(i);
-            if (object)
-                fprintf(stderr, " %s", TypeString(Type::ObjectType(object)));
+            if (object) {
+                JS_snprintf(tmp, tmpLen, " %s", TypeString(Type::ObjectType(object)));
+                addToString(str, &len, tmp);
+            }
         }
+        js_free(tmp);
     }
+
+    return len > 0;
+}
+
+void
+TypeSet::print()
+{
+    int32_t len = 200; // should be enough
+    char *str = js_pod_malloc<char>(len);
+    toString(str, len);
+    fprintf(stderr, "%s", str);
+    js_free(str);
 }
 
 /* static */ void

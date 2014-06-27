@@ -540,6 +540,7 @@ class TypeSet
       : flags(0), objectSet(nullptr)
     {}
 
+    bool toString(char *str, int32_t len);
     void print();
 
     /* Whether this set contains a specific type. */
