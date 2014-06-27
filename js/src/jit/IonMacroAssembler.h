@@ -1027,7 +1027,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     // The safe version of the above method refrains from assuming that the fields
     // of the SPSProfiler class are going to stay the same across different runs of
     // the jitcode.  Ion can use the more efficient unsafe version because ion jitcode
-    // will not survive changes to to the profiler settings.  Baseline jitcode, however,
+    // will not survive changes to the profiler settings.  Baseline jitcode, however,
     // can span these changes, so any hardcoded field values will be incorrect afterwards.
     // All the sps-related methods used by baseline call |spsProfileEntryAddressSafe|.
     void spsProfileEntryAddressSafe(SPSProfiler *p, int offset, Register temp,
