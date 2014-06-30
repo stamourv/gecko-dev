@@ -968,6 +968,11 @@ private:
     void addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types);
 public:
     OptInfo *optInfo() { return optInfo_; }
+    // This function accepts either literal strings or strings allocated with an
+    // IonAllocPolicy. The former do not need to be freed, and the latter will
+    // automatically be freed once we're done compiling, so we shouldn't leak.
+    // These strings are eventually copied over to the SPSProfiler, so freeing
+    // them is not a problem.
     void addOptInfo(const char* log)
     {
         OptInfo::Ptr p = optInfo_->lookup(pc);
