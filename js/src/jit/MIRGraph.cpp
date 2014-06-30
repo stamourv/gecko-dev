@@ -16,6 +16,9 @@
 using namespace js;
 using namespace js::jit;
 
+// initialize compile counter, see MIRGenerator.h
+uint32_t MIRGenerator::nextCompileId = 1;
+
 MIRGenerator::MIRGenerator(CompileCompartment *compartment, const JitCompileOptions &options,
                            TempAllocator *alloc, MIRGraph *graph, CompileInfo *info,
                            const OptimizationInfo *optimizationInfo)

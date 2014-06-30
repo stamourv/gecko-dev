@@ -194,6 +194,32 @@ class MIRGenerator
 
   public:
     const JitCompileOptions options;
+
+    /*
+     * Number that uniquely identifies a compile. Used to associate profiler
+     * samples (which carry that number) with optimization info (which also
+     * carries that number). This avoids having to store the entire optimization
+     * info in each sample (which is not a problem internally, as only a pointer
+     * is stored, but is a problem when outputting the samples, which then have
+     * a *lot* of redundant information).
+     * Starts at 1. 0 is code for "no compiled version", and is used for samples
+     * that correpond to interpreter or baseline code.
+     * Possible issue: If this counter overflows, we may start conflating
+     *   compiles. Since this counter is only used to look up information in
+     *   profiles, and that we're unlikely to be profiling 2^32 functions at
+     *   once, this probably won't be a problem in practice.
+     * Assumption: IonBuilding is not done in parrallel, so we don't need to
+     *   synchronize when accessing this counter.
+     */
+    static uint32_t nextCompileId;
+
+  protected:
+    uint32_t compileId_;
+
+  public:
+    uint32_t compileId() { return compileId_; }
+
+
 };
 
 } // namespace jit

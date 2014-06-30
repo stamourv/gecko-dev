@@ -962,12 +962,16 @@ class IonBuilder : public MIRGenerator
     const CallInfo *inlineCallInfo_;
 
 private:
+
     // one element per getprop/setprop operation
     OptInfo *optInfo_;
     void addOptInfoLocation(const char* log, PropertyName *name);
     void addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types);
+
 public:
+    
     OptInfo *optInfo() { return optInfo_; }
+
     // This function accepts either literal strings or strings allocated with an
     // IonAllocPolicy. The former do not need to be freed, and the latter will
     // automatically be freed once we're done compiling, so we shouldn't leak.

@@ -149,6 +149,9 @@ IonBuilder::IonBuilder(JSContext *analysisContext, CompileCompartment *comp,
     abortReason_ = AbortReason_Disable;
     optInfo_ = new OptInfo(*temp);
     optInfo_->init();
+    compileId_ = nextCompileId;
+    // If we'd overflow, go back to 1. 0 has a special meaning. See comment in MIRGenerator.h
+    nextCompileId = (nextCompileId == UINT32_MAX) ? 1 : nextCompileId + 1;
 
     JS_ASSERT(script()->hasBaselineScript() == (info->executionMode() != ArgumentsUsageAnalysis));
     JS_ASSERT(!!analysisContext == (info->executionMode() == DefinitePropertiesAnalysis));
