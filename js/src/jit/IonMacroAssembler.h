@@ -1013,12 +1013,15 @@ class MacroAssembler : public MacroAssemblerSpecific
             add32(Imm32(offset), temp);
         branch32(Assembler::GreaterThanOrEqual, temp, Imm32(p->maxSize()), full);
 
-        JS_STATIC_ASSERT(sizeof(ProfileEntry) == (2 * sizeof(void *)) + 8);
+        // 2 pointers and 3 int32 + alignment (makes one int32 count as a pointer)
+        JS_STATIC_ASSERT(sizeof(ProfileEntry) == (3 * sizeof(void *)) + 8);
         if (sizeof(void *) == 4) {
-            lshiftPtr(Imm32(4), temp);
-        } else {
-            lshiftPtr(Imm32(3), temp);
-            mulBy3(temp, temp);
+            // mul by 20
+            lshiftPtr(Imm32(2), temp);
+            mulBy5(temp, temp);
+        } else { // sizeof(void *) == 8
+            // mul by 32
+            lshiftPtr(Imm32(5), temp);
         }
 
         addPtr(ImmPtr(p->stack()), temp);
@@ -1044,12 +1047,15 @@ class MacroAssembler : public MacroAssemblerSpecific
         // Test against max size.
         branch32(Assembler::LessThanOrEqual, AbsoluteAddress(p->addressOfMaxSize()), temp, full);
 
-        JS_STATIC_ASSERT(sizeof(ProfileEntry) == (2 * sizeof(void *)) + 8);
+        // 2 pointers and 3 int32 + alignment (makes one int32 count as a pointer)
+        JS_STATIC_ASSERT(sizeof(ProfileEntry) == (3 * sizeof(void *)) + 8);
         if (sizeof(void *) == 4) {
-            lshiftPtr(Imm32(4), temp);
-        } else {
-            lshiftPtr(Imm32(3), temp);
-            mulBy3(temp, temp);
+            // mul by 20
+            lshiftPtr(Imm32(2), temp);
+            mulBy5(temp, temp);
+        } else { // sizeof(void *) == 8
+            // mul by 32
+            lshiftPtr(Imm32(5), temp);
         }
 
         push(temp);
@@ -1078,15 +1084,19 @@ class MacroAssembler : public MacroAssemblerSpecific
     }
 
     // spsPushFrame variant for Ion-optimized scripts.
-    void spsPushFrame(SPSProfiler *p, const char *str, JSScript *s, Register temp) {
+    void spsPushFrame(SPSProfiler *p, const char *str, uint32_t compileId,
+                      JSScript *s, Register temp) {
         Label stackFull;
         spsProfileEntryAddress(p, 0, temp, &stackFull);
 
         // Push a JS frame with a copy label
         storePtr(ImmPtr(str), Address(temp, ProfileEntry::offsetOfLabel()));
         storePtr(ImmGCPtr(s), Address(temp, ProfileEntry::offsetOfSpOrScript()));
-        store32(Imm32(ProfileEntry::NullPCOffset), Address(temp, ProfileEntry::offsetOfLineOrPc()));
-        store32(Imm32(ProfileEntry::FRAME_LABEL_COPY), Address(temp, ProfileEntry::offsetOfFlags()));
+        store32(Imm32(ProfileEntry::NullPCOffset),
+                Address(temp, ProfileEntry::offsetOfLineOrPc()));
+        store32(Imm32(ProfileEntry::FRAME_LABEL_COPY),
+                Address(temp, ProfileEntry::offsetOfFlags()));
+        store32(Imm32(compileId), Address(temp, ProfileEntry::offsetOfCompileId()));
 
         /* Always increment the stack size, whether or not we actually pushed. */
         bind(&stackFull);
@@ -1113,6 +1123,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         //  with 0 pcIdx).
         store32(Imm32(0), Address(temp, ProfileEntry::offsetOfLineOrPc()));
         store32(Imm32(ProfileEntry::FRAME_LABEL_COPY), Address(temp, ProfileEntry::offsetOfFlags()));
+        store32(Imm32(0), Address(temp, ProfileEntry::offsetOfCompileId()));
 
         /* Always increment the stack size, whether or not we actually pushed. */
         bind(&stackFull);

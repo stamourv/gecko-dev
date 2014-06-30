@@ -161,7 +161,8 @@ SPSProfiler::enter(JSScript *script, JSFunction *maybeFun)
     }
 #endif
 
-    push(str, nullptr, script, script->code(), /* copy = */ true);
+    // compile id is 0 because |enter| is never called for Ion-compiled code
+    push(str, 0, nullptr, script, script->code(), /* copy = */ true);
     return true;
 }
 
@@ -216,7 +217,8 @@ SPSProfiler::enterAsmJS(const char *string, void *sp)
 }
 
 void
-SPSProfiler::push(const char *string, void *sp, JSScript *script, jsbytecode *pc, bool copy)
+SPSProfiler::push(const char *string, uint32_t compileId, void *sp,
+                  JSScript *script, jsbytecode *pc, bool copy)
 {
     JS_ASSERT_IF(sp != nullptr, script == nullptr && pc == nullptr);
     JS_ASSERT_IF(sp == nullptr, script != nullptr && pc != nullptr);
@@ -230,6 +232,7 @@ SPSProfiler::push(const char *string, void *sp, JSScript *script, jsbytecode *pc
     if (current < max_) {
         volatile ProfileEntry &entry = stack[current];
         entry.setLabel(string);
+        entry.setCompileId(compileId);
 
         if (sp != nullptr) {
             entry.setCppFrame(sp, 0);
@@ -322,9 +325,9 @@ SPSEntryMarker::SPSEntryMarker(JSRuntime *rt,
     }
     size_before = *profiler->size_;
     // We want to push a CPP frame so the profiler can correctly order JS and native stacks.
-    profiler->push("js::RunScript", this, nullptr, nullptr, /* copy = */ false);
+    profiler->push("js::RunScript", 0, this, nullptr, nullptr, /* copy = */ false);
     // We also want to push a JS frame so the hang monitor can catch script hangs.
-    profiler->push("js::RunScript", nullptr, script, script->code(), /* copy = */ false);
+    profiler->push("js::RunScript", 0, nullptr, script, script->code(), /* copy = */ false);
 }
 
 SPSEntryMarker::~SPSEntryMarker()

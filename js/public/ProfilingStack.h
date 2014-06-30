@@ -49,6 +49,8 @@ class ProfileEntry
     // General purpose storage describing this frame.
     uint32_t volatile flags_;
 
+    uint32_t volatile compileId_;
+
   public:
     // These traits are bit masks. Make sure they're powers of 2.
     enum Flags {
@@ -96,6 +98,9 @@ class ProfileEntry
 
     void setLabel(const char *aString) volatile { string = aString; }
     const char *label() const volatile { return string; }
+
+    void setCompileId(uint32_t id) volatile { compileId_ = id; }
+    uint32_t compileId() const volatile { return compileId_; }
 
     void setJsFrame(JSScript *aScript, jsbytecode *aPc) volatile {
         flags_ = 0;
@@ -153,6 +158,7 @@ class ProfileEntry
     static size_t offsetOfSpOrScript() { return offsetof(ProfileEntry, spOrScript); }
     static size_t offsetOfLineOrPc() { return offsetof(ProfileEntry, lineOrPc); }
     static size_t offsetOfFlags() { return offsetof(ProfileEntry, flags_); }
+    static size_t offsetOfCompileId() { return offsetof(ProfileEntry, compileId_); }
 };
 
 JS_FRIEND_API(void)

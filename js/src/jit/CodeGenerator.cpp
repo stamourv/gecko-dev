@@ -8688,7 +8688,8 @@ CodeGenerator::visitProfilerStackOp(LProfilerStackOp *lir)
                 return true;
             }
 
-            return sps_.push(lir->script(), masm, temp, /* inlinedFunction = */ false);
+            return sps_.push(lir->script(), masm, temp, /* inlinedFunction = */ false,
+                             gen->compileId());
 
         case MProfilerStackOp::Exit:
             if (gen->options.spsSlowAssertionsEnabled()) {

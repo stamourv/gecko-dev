@@ -128,7 +128,8 @@ class SPSProfiler
     void                (*eventMarker_)(const char *);
 
     const char *allocProfileString(JSScript *script, JSFunction *function);
-    void push(const char *string, void *sp, JSScript *script, jsbytecode *pc, bool copy);
+    void push(const char *string, uint32_t compileId, void *sp,
+              JSScript *script, jsbytecode *pc, bool copy);
     void pop();
 
   public:
@@ -427,14 +428,16 @@ class SPSInstrumentation
      * Flags entry into a JS function for the first time. Before this is called,
      * no instrumentation is emitted, but after this instrumentation is emitted.
      */
-    bool push(JSScript *script, Assembler &masm, Register scratch, bool inlinedFunction = false) {
+    bool push(JSScript *script, Assembler &masm, Register scratch, bool inlinedFunction = false,
+              uint32_t compileId = 0) {
         if (!enabled())
             return true;
         if (!inlinedFunction) {
             const char *string = profiler_->profileString(script, script->functionNonDelazifying());
             if (string == nullptr)
                 return false;
-            masm.spsPushFrame(profiler_, string, script, scratch);
+
+            masm.spsPushFrame(profiler_, string, compileId, script, scratch);
         }
         setPushed(script);
         return true;

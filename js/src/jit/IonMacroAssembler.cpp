@@ -2050,6 +2050,7 @@ MacroAssembler::spsMarkJit(SPSProfiler *p, Register framePtr, Register temp)
     storePtr(framePtr,              Address(temp, ProfileEntry::offsetOfSpOrScript()));
     store32(Imm32(0),               Address(temp, ProfileEntry::offsetOfLineOrPc()));
     store32(Imm32(ProfileEntry::IS_CPP_ENTRY), Address(temp, ProfileEntry::offsetOfFlags()));
+    store32(Imm32(0), Address(temp, ProfileEntry::offsetOfCompileId()));
 
     /* Always increment the stack size, whether or not we actually pushed. */
     bind(&stackFull);
