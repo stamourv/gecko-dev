@@ -390,6 +390,10 @@ void addPseudoEntry(volatile StackEntry &entry, ThreadProfile &aProfile,
     aProfile.addTag(ProfileEntry('n', lineno));
   }
 
+  if (entry.compileId() != 0){
+    aProfile.addTag(ProfileEntry('o', entry.compileId()));
+  }
+
   uint32_t category = entry.category();
   MOZ_ASSERT(!(category & StackEntry::IS_CPP_ENTRY));
   MOZ_ASSERT(!(category & StackEntry::FRAME_LABEL_COPY));

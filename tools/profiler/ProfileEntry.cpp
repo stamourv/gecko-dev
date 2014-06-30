@@ -64,6 +64,11 @@ ProfileEntry::ProfileEntry(char aTagName, int aTagInt)
   , mTagName(aTagName)
 { }
 
+ProfileEntry::ProfileEntry(char aTagName, uint32_t aTagUint32)
+  : mTagUint32(aTagUint32)
+  , mTagName(aTagName)
+{ }
+
 ProfileEntry::ProfileEntry(char aTagName, char aTagChar)
   : mTagChar(aTagChar)
   , mTagName(aTagName)
@@ -104,7 +109,7 @@ void ProfileEntry::log()
       LOGF("%c \"%s\"", mTagName, mTagData); break;
     case 'd': case 'l': case 'L': case 'B': case 'S':
       LOGF("%c %p", mTagName, mTagPtr); break;
-    case 'n': case 'f': case 'y':
+    case 'n': case 'f': case 'y': case 'o':
       LOGF("%c %d", mTagName, mTagInt); break;
     case 'h':
       LOGF("%c \'%c\'", mTagName, mTagChar); break;
@@ -445,6 +450,12 @@ void ThreadProfile::StreamJSObject(JSStreamWriter& b)
                       if (readAheadPos != mLastFlushPos &&
                           mEntries[readAheadPos].mTagName == 'y') {
                         b.NameValue("category", mEntries[readAheadPos].mTagInt);
+                        incBy++;
+                      }
+                      readAheadPos = (framePos + incBy) % mEntrySize;
+                      if (readAheadPos != mLastFlushPos &&
+                          mEntries[readAheadPos].mTagName == 'o') {
+                        b.NameValue("compile-id", mEntries[readAheadPos].mTagUint32);
                         incBy++;
                       }
                     b.EndObject();

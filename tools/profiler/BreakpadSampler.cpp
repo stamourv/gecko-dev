@@ -124,6 +124,10 @@ void genProfileEntry(/*MODIFIED*/UnwinderThreadBuffer* utb,
   if (lineno != -1) {
     utb__addEntry( utb, ProfileEntry('n', lineno) );
   }
+  if (entry.compileId() != 0){
+    utb__addEntry( utb, ProfileEntry('o', entry.compileId()) );
+  }
+
 
   // Add a pseudostack-entry end label
   utb__addEntry( utb, ProfileEntry('h', 'Q') );

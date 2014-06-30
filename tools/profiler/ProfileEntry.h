@@ -32,6 +32,7 @@ public:
   ProfileEntry(char aTagName, uintptr_t aTagOffset);
   ProfileEntry(char aTagName, Address aTagAddress);
   ProfileEntry(char aTagName, int aTagLine);
+  ProfileEntry(char aTagName, uint32_t aTagUint32);
   ProfileEntry(char aTagName, char aTagChar);
   friend std::ostream& operator<<(std::ostream& stream, const ProfileEntry& entry);
   bool is_ent_hint(char hintChar);
@@ -62,6 +63,7 @@ private:
     Address     mTagAddress;
     uintptr_t   mTagOffset;
     int         mTagInt;
+    uint32_t    mTagUint32;
     char        mTagChar;
   };
   char mTagName;
