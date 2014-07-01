@@ -45,6 +45,7 @@
 #include "vm/ForkJoin.h"
 #include "vm/HelperThreads.h"
 #include "vm/TraceLogging.h"
+#include "vm/SPSProfiler.h"
 
 #include "jscompartmentinlines.h"
 #include "jsgcinlines.h"
@@ -1963,6 +1964,46 @@ IonCompile(JSContext *cx, JSScript *script,
 
     bool succeeded = builder->build();
     builder->clearForBackEnd();
+
+    // Emit a profiling event to record optimization decisions that were made
+    // during this compile. Also store the id of this compile in the SPS
+    // profiler object, so that we can later map samples to optimization info.
+    OptInfo *optInfo = builder->optInfo();
+    if (ictx.runtime->spsProfiler().enabled() && !optInfo->empty()) {
+
+        // First, compute how much space we're going to need.
+        char *prefix = "optimization info for compile #";
+        // 10 = printed length of INT32_MAX, +1 for separator
+        size_t totalLength = strlen(prefix) + 11;
+        for (OptInfo::Enum e(*optInfo); !e.empty(); e.popFront()) {
+            OptInfoEntry *v = e.front().value();
+            for (size_t j = 0; j < v->length(); j++) {
+                totalLength += strlen((*v)[j]);
+            }
+            totalLength += v->length(); // separators
+        }
+        totalLength += optInfo->count(); // separators
+
+        char *buffer = js_pod_malloc<char>(totalLength + 1); // +1 for terminator
+        JS_snprintf(buffer, totalLength, "%s%u|", prefix, builder->compileId());
+
+        // Uses ";" to separate logs that affect the same operation.
+        // Uses "|" to separate operations.
+        for (OptInfo::Enum e2(*optInfo); !e2.empty(); e2.popFront()) {
+            OptInfoEntry *v = e2.front().value();
+            for (size_t j = 0; j < v->length(); j++) {
+                // TODO bleh, n^2 for appending repeatedly
+                const char *logEntry = (*v)[j];
+                strcat(buffer, logEntry);
+                strcat(buffer, ";");
+            }
+            strcat(buffer, "|");
+        }
+
+        // Emit profiling event.
+        ictx.runtime->spsProfiler().markEvent(buffer);
+        js_free(buffer);
+    }
 
     if (!succeeded)
         return builder->abortReason();
