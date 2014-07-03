@@ -89,6 +89,48 @@ types::TypeIdStringImpl(jsid id)
 // Logging
 /////////////////////////////////////////////////////////////////////
 
+const char *
+types::TypeString(Type type)
+{
+    if (type.isPrimitive()) {
+        switch (type.primitive()) {
+          case JSVAL_TYPE_UNDEFINED:
+            return "void";
+          case JSVAL_TYPE_NULL:
+            return "null";
+          case JSVAL_TYPE_BOOLEAN:
+            return "bool";
+          case JSVAL_TYPE_INT32:
+            return "int";
+          case JSVAL_TYPE_DOUBLE:
+            return "float";
+          case JSVAL_TYPE_STRING:
+            return "string";
+          case JSVAL_TYPE_SYMBOL:
+            return "symbol";
+          case JSVAL_TYPE_MAGIC:
+            return "lazyargs";
+          default:
+            MOZ_ASSUME_UNREACHABLE("Bad type");
+        }
+    }
+    if (type.isUnknown())
+        return "unknown";
+    if (type.isAnyObject())
+        return " object";
+
+    static char bufs[4][40];
+    static unsigned which = 0;
+    which = (which + 1) & 3;
+
+    if (type.isSingleObject())
+        JS_snprintf(bufs[which], 40, "<0x%p>", (void *) type.singleObject());
+    else
+        JS_snprintf(bufs[which], 40, "[0x%p]", (void *) type.typeObject());
+
+    return bufs[which];
+}
+
 #ifdef DEBUG
 
 static bool InferSpewActive(SpewChannel channel)
@@ -159,48 +201,6 @@ types::InferSpewColor(TypeSet *types)
     if (!InferSpewColorable())
         return "";
     return colors[DefaultHasher<TypeSet *>::hash(types) % 7];
-}
-
-const char *
-types::TypeString(Type type)
-{
-    if (type.isPrimitive()) {
-        switch (type.primitive()) {
-          case JSVAL_TYPE_UNDEFINED:
-            return "void";
-          case JSVAL_TYPE_NULL:
-            return "null";
-          case JSVAL_TYPE_BOOLEAN:
-            return "bool";
-          case JSVAL_TYPE_INT32:
-            return "int";
-          case JSVAL_TYPE_DOUBLE:
-            return "float";
-          case JSVAL_TYPE_STRING:
-            return "string";
-          case JSVAL_TYPE_SYMBOL:
-            return "symbol";
-          case JSVAL_TYPE_MAGIC:
-            return "lazyargs";
-          default:
-            MOZ_ASSUME_UNREACHABLE("Bad type");
-        }
-    }
-    if (type.isUnknown())
-        return "unknown";
-    if (type.isAnyObject())
-        return " object";
-
-    static char bufs[4][40];
-    static unsigned which = 0;
-    which = (which + 1) & 3;
-
-    if (type.isSingleObject())
-        JS_snprintf(bufs[which], 40, "<0x%p>", (void *) type.singleObject());
-    else
-        JS_snprintf(bufs[which], 40, "[0x%p]", (void *) type.typeObject());
-
-    return bufs[which];
 }
 
 const char *

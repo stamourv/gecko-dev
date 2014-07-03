@@ -1604,6 +1604,8 @@ enum SpewChannel {
     SPEW_COUNT
 };
 
+const char * TypeString(Type type);
+
 #ifdef DEBUG
 
 const char * InferSpewColorReset();
@@ -1611,7 +1613,6 @@ const char * InferSpewColor(TypeConstraint *constraint);
 const char * InferSpewColor(TypeSet *types);
 
 void InferSpew(SpewChannel which, const char *fmt, ...);
-const char * TypeString(Type type);
 const char * TypeObjectString(TypeObject *type);
 
 /* Check that the type property for id in obj contains value. */
@@ -1623,7 +1624,6 @@ inline const char * InferSpewColorReset() { return nullptr; }
 inline const char * InferSpewColor(TypeConstraint *constraint) { return nullptr; }
 inline const char * InferSpewColor(TypeSet *types) { return nullptr; }
 inline void InferSpew(SpewChannel which, const char *fmt, ...) {}
-inline const char * TypeString(Type type) { return nullptr; }
 inline const char * TypeObjectString(TypeObject *type) { return nullptr; }
 
 #endif
