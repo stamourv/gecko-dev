@@ -577,7 +577,8 @@ static void addToString(char *str, int32_t *len, const char *msg) {
 }
 
 bool // true if printed everything, false if we had to truncate
-TypeSet::toString(char *str, int32_t len)
+TypeSet::toString(char *str, int32_t len, bool showConstructor,
+                  TypeObjectWithNewScriptSet *newTypeObjects)
 {
     str[0] = 0; // so that strcat finds an end to append to
 
@@ -621,7 +622,8 @@ TypeSet::toString(char *str, int32_t len)
 
     uint32_t objectCount = baseObjectCount();
     if (objectCount) {
-        size_t tmpLen = 30;
+
+        size_t tmpLen = 100;
         char *tmp = js_pod_malloc<char>(tmpLen); // should be enough
         JS_snprintf(tmp, tmpLen, " object[%u]", objectCount);
         addToString(str, &len, tmp);
@@ -630,7 +632,30 @@ TypeSet::toString(char *str, int32_t len)
         for (unsigned i = 0; i < count; i++) {
             TypeObjectKey *object = getObject(i);
             if (object) {
-                JS_snprintf(tmp, tmpLen, " %s", TypeString(Type::ObjectType(object)));
+                if (showConstructor) {
+                    // need to pass a type objects table to look up constructors
+                    JS_ASSERT(newTypeObjects != nullptr);
+                    JSScript *constructor = object->lookupConstructor(newTypeObjects);
+                    if (constructor != nullptr) {
+                        JSFunction *function = constructor->functionDelazifying();
+                        const jschar *constructorName = u"(unknown-constructor-name)";
+                        if (function && function->name()) {
+                            constructorName
+                                = JSID_TO_FLAT_STRING(NameToId(function->name()))->chars();
+                        }
+                        JS_snprintf(tmp, tmpLen, " %hs:%s:%u:%s",
+                                    constructorName,
+                                    constructor->filename(),
+                                    constructor->lineno(),
+                                    TypeString(Type::ObjectType(object)));
+                    } else {
+                        JS_snprintf(tmp, tmpLen, " (unknown-constructor):%s",
+                                    TypeString(Type::ObjectType(object)));
+                    }
+                } else {
+                    // Note: will print as null pointer outside of debug mode.
+                    JS_snprintf(tmp, tmpLen, " %s", TypeString(Type::ObjectType(object)));
+                }
                 addToString(str, &len, tmp);
             }
         }
@@ -1065,6 +1090,23 @@ TypeObjectKey::ensureTrackedProperty(JSContext *cx, jsid id)
                 EnsureTrackPropertyTypes(cx, obj, id);
         }
     }
+}
+
+JSScript *
+TypeObjectKey::lookupConstructor(TypeObjectWithNewScriptSet *newTypeObjects)
+{
+    for (TypeObjectWithNewScriptSet::Enum e(*newTypeObjects); !e.empty(); e.popFront()) {
+        TypeObjectWithNewScriptEntry k = e.front();
+        if (maybeType() == k.object.get()) { // found it
+            JSFunction *f = k.newFunction;
+            if (f != nullptr) {
+                return f->nonLazyScript();
+            }
+            return nullptr;
+        }
+    }
+    // didn't find it
+    return nullptr;
 }
 
 bool
@@ -4455,8 +4497,8 @@ JSCompartment::sweepNewTypeObjectTable(TypeObjectWithNewScriptSet &table)
         for (TypeObjectWithNewScriptSet::Enum e(table); !e.empty(); e.popFront()) {
             TypeObjectWithNewScriptEntry entry = e.front();
             if (IsTypeObjectAboutToBeFinalized(entry.object.unsafeGet()) ||
-                (entry.newFunction && IsObjectAboutToBeFinalized(&entry.newFunction)))
-            {
+                (entry.newFunction.get()
+                 && IsObjectAboutToBeFinalized(&entry.newFunction.unsafeGet()))) {
                 e.removeFront();
             } else {
                 /* Any rekeying necessary is handled by fixupNewTypeObjectTable() below. */

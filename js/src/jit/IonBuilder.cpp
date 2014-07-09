@@ -8737,11 +8737,13 @@ IonBuilder::addOptInfoLocation(const char* op, PropertyName *name)
 void
 IonBuilder::addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types)
 {
-    int32_t len = 200; // should be enough to print a typeset
+    int32_t len = 500; // should be enough to print a typeset
     char *str = (char *) alloc().allocateArray<sizeof(char)>(len);
     strcpy(str, prefix);
     if(types) {
-        types->toString(str+strlen(prefix), len-strlen(prefix));
+        types->toString(str+strlen(prefix), len-strlen(prefix),
+                        /* showConstructor = */ true,
+                        /* newTypeObjects = */ &compartment->newTypeObjects());
     }
     addOptInfo(str);
 }
@@ -9523,7 +9525,7 @@ IonBuilder::jsop_setprop(PropertyName *name)
     types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
     addOptInfoTypeset("obj types:", objTypes);
 
-    int32_t typeLen = 200; // should be enough
+    int32_t typeLen = 500; // should be enough
     jsid id = name ? NameToId(name) : JSID_VOID;
     char *propTypeStr = (char *) alloc().allocateArray<sizeof(char)>(typeLen);
     char *propPrefix = "property types:";
@@ -9538,7 +9540,10 @@ IonBuilder::jsop_setprop(PropertyName *name)
             // TODO bleh n^2
             // toString stops printing if it reaches the end of the buffer,
             // so we don't need to check here
-            object->property(id).maybeTypes()->toString(propCursor, propLen);
+            object->property(id).maybeTypes()
+                ->toString(propCursor, propLen,
+                           /* showConstructor = */ true,
+                           /* newTypeObjects = */ &compartment->newTypeObjects());
             strcat(propTypeStr, ",");
             propCursor = propTypeStr + strlen(propTypeStr) + 1;
             propLen = typeLen - strlen(propTypeStr) - 1;

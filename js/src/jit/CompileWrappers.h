@@ -8,6 +8,7 @@
 #define jit_CompileWrappers_h
 
 #include "jscntxt.h"
+#include "jsinfer.h"
 
 namespace js {
 namespace jit {
@@ -115,6 +116,8 @@ class CompileCompartment
     const JitCompartment *jitCompartment();
 
     bool hasObjectMetadataCallback();
+
+    js::types::TypeObjectWithNewScriptSet &newTypeObjects();
 
     // Mirror CompartmentOptions.
     void setSingletonsAsValues();

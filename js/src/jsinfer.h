@@ -509,6 +509,10 @@ typedef uint32_t TypeObjectFlags;
 class StackTypeSet;
 class HeapTypeSet;
 class TemporaryTypeSet;
+struct TypeObjectWithNewScriptEntry;
+typedef HashSet<TypeObjectWithNewScriptEntry,
+                TypeObjectWithNewScriptEntry,
+                SystemAllocPolicy> TypeObjectWithNewScriptSet;
 
 /*
  * Information about the set of types associated with an lvalue. There are
@@ -540,7 +544,10 @@ class TypeSet
       : flags(0), objectSet(nullptr)
     {}
 
-    bool toString(char *str, int32_t len);
+    /* If showConstructor is true, use constructor location when showing object types, (which
+       requires a new type table to look up) instead of using the address of the object type. */
+    bool toString(char *str, int32_t len, bool showConstructor = false,
+                  TypeObjectWithNewScriptSet *newTypeObjects = nullptr);
     void print();
 
     /* Whether this set contains a specific type. */
@@ -1154,11 +1161,10 @@ struct TypeObjectWithNewScriptEntry
 {
     ReadBarrieredTypeObject object;
 
-    // Note: This pointer is only used for equality and does not need a read barrier.
-    JSFunction *newFunction;
+    ReadBarrieredFunction newFunction;
 
     TypeObjectWithNewScriptEntry(TypeObject *object, JSFunction *newFunction)
-      : object(object), newFunction(newFunction)
+      : object(object), newFunction(ReadBarriered<JSFunction *>(newFunction))
     {}
 
     struct Lookup {
@@ -1187,9 +1193,6 @@ struct TypeObjectWithNewScriptEntry
     static inline bool match(const TypeObjectWithNewScriptEntry &key, const Lookup &lookup);
     static void rekey(TypeObjectWithNewScriptEntry &k, const TypeObjectWithNewScriptEntry& newKey) { k = newKey; }
 };
-typedef HashSet<TypeObjectWithNewScriptEntry,
-                TypeObjectWithNewScriptEntry,
-                SystemAllocPolicy> TypeObjectWithNewScriptSet;
 
 /* Whether to use a new type object when calling 'new' at script/pc. */
 bool
@@ -1378,6 +1381,8 @@ struct TypeObjectKey
     void ensureTrackedProperty(JSContext *cx, jsid id);
 
     TypeObject *maybeType();
+
+    JSScript *lookupConstructor(TypeObjectWithNewScriptSet *newTypeObjects);
 };
 
 // Representation of a heap type property which may or may not be instantiated.

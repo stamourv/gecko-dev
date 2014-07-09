@@ -256,6 +256,12 @@ CompileCompartment::hasObjectMetadataCallback()
     return compartment()->hasObjectMetadataCallback();
 }
 
+js::types::TypeObjectWithNewScriptSet &
+CompileCompartment::newTypeObjects()
+{
+    return compartment()->newTypeObjects;
+}
+
 // Note: This function is thread-safe because setSingletonAsValue sets a boolean
 // variable to false, and this boolean variable has no way to be resetted to
 // true. So even if there is a concurrent write, this concurrent write will
