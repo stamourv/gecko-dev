@@ -7812,20 +7812,39 @@ IonBuilder::jsop_setelem()
     MDefinition *index = current->pop();
     MDefinition *object = current->pop();
 
-    if (!setElemTryTypedObject(&emitted, object, index, value) || emitted)
-        return emitted;
+    addOptInfoLocation("setelem");
+    addOptInfoTypeset("obj types:", object->resultTypeSet());
+    // MIR type is info enough here
+    addOptInfoMIRType("index types:", index->type());
+    addOptInfoTypeset("value types:", value->resultTypeSet());
 
-    if (!setElemTryTypedStatic(&emitted, object, index, value) || emitted)
-        return emitted;
 
-    if (!setElemTryTypedArray(&emitted, object, index, value) || emitted)
+    if (!setElemTryTypedObject(&emitted, object, index, value) || emitted) {
+        addOptInfo("trying typed object");
+        addOptInfo("success");
         return emitted;
+    }
+
+    if (!setElemTryTypedStatic(&emitted, object, index, value) || emitted) {
+        addOptInfo("trying static typed array");
+        addOptInfo("success");
+        return emitted;
+    }
+
+    if (!setElemTryTypedArray(&emitted, object, index, value) || emitted) {
+        addOptInfo("trying typed array");
+        addOptInfo("success");
+        return emitted;
+    }
 
     if (!setElemTryDense(&emitted, object, index, value) || emitted)
         return emitted;
 
-    if (!setElemTryArguments(&emitted, object, index, value) || emitted)
+    if (!setElemTryArguments(&emitted, object, index, value) || emitted) {
+        addOptInfo("trying arguments");
+        addOptInfo("success");
         return emitted;
+    }
 
     if (script()->argumentsHasVarBinding() && object->mightBeType(MIRType_MagicOptimizedArguments))
         return abort("Type is not definitely lazy arguments.");
@@ -7837,6 +7856,9 @@ IonBuilder::jsop_setelem()
     MInstruction *ins = MCallSetElement::New(alloc(), object, index, value);
     current->add(ins);
     current->push(value);
+
+    addOptInfo("trying emitting a call");
+    addOptInfo("success");
 
     return resumeAfter(ins);
 }
@@ -8006,15 +8028,20 @@ IonBuilder::setElemTryDense(bool *emitted, MDefinition *object,
 {
     JS_ASSERT(*emitted == false);
 
-    if (!ElementAccessIsDenseNative(object, index))
+    addOptInfo("trying dense access");
+
+    if (!ElementAccessIsDenseNative(object, index, /* log = */ true))
         return true;
     if (PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current,
                                       &object, nullptr, &value, /* canModify = */ true))
     {
+        addOptInfo("failure, needs type barrier");
         return true;
     }
-    if (!object->resultTypeSet())
+    if (!object->resultTypeSet()) {
+        addOptInfo("failure, no type info");
         return true;
+    }
 
     types::TemporaryTypeSet::DoubleConversion conversion =
         object->resultTypeSet()->convertDoubleElements(constraints());
@@ -8023,17 +8050,22 @@ IonBuilder::setElemTryDense(bool *emitted, MDefinition *object,
     if (conversion == types::TemporaryTypeSet::AmbiguousDoubleConversion &&
         value->type() != MIRType_Int32)
     {
+        addOptInfo("failure, index may not be convertible to int32");
         return true;
     }
 
     // Don't generate a fast path if there have been bounds check failures
     // and this access might be on a sparse property.
-    if (ElementAccessHasExtraIndexedProperty(constraints(), object) && failedBoundsCheck_)
+    if (ElementAccessHasExtraIndexedProperty(constraints(), object) && failedBoundsCheck_) {
+        addOptInfo("failure, seen failed bounds check and may be sparse");
         return true;
+    }
 
     // Emit dense setelem variant.
     if (!jsop_setelem_dense(conversion, SetElem_Normal, object, index, value))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
@@ -8058,13 +8090,18 @@ IonBuilder::setElemTryCache(bool *emitted, MDefinition *object,
 {
     JS_ASSERT(*emitted == false);
 
-    if (!object->mightBeType(MIRType_Object))
+    addOptInfo("trying emitting a polymorphic cache");
+
+    if (!object->mightBeType(MIRType_Object)) {
+        addOptInfo("failure, not an object");
         return true;
+    }
 
     if (!index->mightBeType(MIRType_Int32) &&
         !index->mightBeType(MIRType_String) &&
         !index->mightBeType(MIRType_Symbol))
     {
+        addOptInfo("failure, index not an integer, string or symbol");
         return true;
     }
 
@@ -8072,12 +8109,15 @@ IonBuilder::setElemTryCache(bool *emitted, MDefinition *object,
     // Temporary disable the cache if non dense native,
     // until the cache supports more ics
     SetElemICInspector icInspect(inspector->setElemICInspector(pc));
-    if (!icInspect.sawDenseWrite() && !icInspect.sawTypedArrayWrite())
+    if (!icInspect.sawDenseWrite() && !icInspect.sawTypedArrayWrite()) {
+        addOptInfo("failure, did not see dense write");
         return true;
+    }
 
     if (PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current,
                                       &object, nullptr, &value, /* canModify = */ true))
     {
+        addOptInfo("failure, needs type barrier");
         return true;
     }
 
@@ -8100,6 +8140,8 @@ IonBuilder::setElemTryCache(bool *emitted, MDefinition *object,
 
     if (!resumeAfter(ins))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
