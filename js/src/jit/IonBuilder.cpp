@@ -8755,6 +8755,19 @@ IonBuilder::addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types
     addOptInfo(str);
 }
 
+void
+IonBuilder::addOptInfoMIRType(const char *prefix, MIRType type)
+{
+    int32_t len = 50 + strlen(prefix); // should be enough to print a MIR type
+    char *str = (char *) alloc().allocateArray<sizeof(char)>(len);
+    strcpy(str, prefix);
+    strcat(str, " ");
+    if(type) {
+        strncat(str, StringFromMIRType(type), len - strlen(prefix) - 1);
+    }
+    addOptInfo(str);
+}
+
 bool
 IonBuilder::jsop_getprop(PropertyName *name)
 {
@@ -9562,11 +9575,8 @@ IonBuilder::jsop_setprop(PropertyName *name)
     char *valuePrefix = "value types:";
     if (valueTypes)
         addOptInfoTypeset(valuePrefix, valueTypes);
-    else { // If we don't have TI type info, report the MIR type instead.
-        char *valueStr = (char *) alloc().allocateArray<sizeof(char)>(typeLen);
-        JS_snprintf(valueStr, typeLen, "%s %s", valuePrefix, StringFromMIRType(value->type()));
-        addOptInfo(valueStr);
-    }
+    else // If we don't have TI type info, report the MIR type instead.
+        addOptInfoMIRType(valuePrefix, value->type());
     
     // Add post barrier if needed.
     if (NeedsPostBarrier(info(), value))

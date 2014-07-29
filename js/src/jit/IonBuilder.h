@@ -968,6 +968,7 @@ private:
     void addOptInfoLocation(const char* log);
     void addOptInfoLocationProperty(const char* log, PropertyName *name);
     void addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types);
+    void addOptInfoMIRType(const char *prefix, MIRType type);
 
 public:
     
