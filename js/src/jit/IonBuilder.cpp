@@ -8720,19 +8720,26 @@ IonBuilder::storeSlot(MDefinition *obj, Shape *shape, MDefinition *value, bool n
 }
 
 void
-IonBuilder::addOptInfoLocation(const char* op, PropertyName *name)
+IonBuilder::addOptInfoLocation(const char* op)
 {
-    jsid id = name ? NameToId(name) : JSID_VOID;
     unsigned column = 0;
     unsigned line = PCToLineNumber(script(), pc, &column);
     size_t bufsize = 200; // should be enough
     char *loc = js_pod_malloc<char>(bufsize);
     JS_snprintf(loc, bufsize,
-                "optimizing %s %hs %s:%d:%d #%u:%05u",
-                op, JSID_TO_FLAT_STRING(id)->chars(),
-                script()->filename(), line, column, script()->id(), script()->pcToOffset(pc));
+                "optimizing %s %s:%d:%d #%u:%05u",
+                op, script()->filename(), line, column, script()->id(), script()->pcToOffset(pc));
     addOptInfo(const_cast<const char *>(loc));
 }   
+void
+IonBuilder::addOptInfoLocationProperty(const char* op, PropertyName *name)
+{
+    jsid id = name ? NameToId(name) : JSID_VOID;
+    size_t bufsize = 100; // should be enough
+    char *log = js_pod_malloc<char>(bufsize);
+    JS_snprintf(log, bufsize, "%s %hs", op, JSID_TO_FLAT_STRING(id)->chars());
+    addOptInfoLocation(log);
+}
 
 void
 IonBuilder::addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types)
@@ -8792,7 +8799,7 @@ IonBuilder::jsop_getprop(PropertyName *name)
         return resumeAfter(call) && pushTypeBarrier(call, types, BarrierKind::TypeSet);
     }
 
-    addOptInfoLocation("getprop", name);
+    addOptInfoLocationProperty("getprop", name);
 
     types::TemporaryTypeSet *objTypes = obj->resultTypeSet();
     addOptInfoTypeset("obj types:", objTypes);
@@ -9519,7 +9526,7 @@ IonBuilder::jsop_setprop(PropertyName *name)
         return resumeAfter(ins);
     }
 
-    addOptInfoLocation("setprop", name);
+    addOptInfoLocationProperty("setprop", name);
 
 
     types::TemporaryTypeSet *objTypes = obj->resultTypeSet();

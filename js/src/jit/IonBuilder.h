@@ -965,7 +965,8 @@ private:
 
     // one element per getprop/setprop operation
     OptInfo *optInfo_;
-    void addOptInfoLocation(const char* log, PropertyName *name);
+    void addOptInfoLocation(const char* log);
+    void addOptInfoLocationProperty(const char* log, PropertyName *name);
     void addOptInfoTypeset(const char *prefix, types::TemporaryTypeSet *types);
 
 public:
