@@ -563,6 +563,8 @@ class IonBuilder : public MIRGenerator
                                             TypedObjectPrediction objTypeReprs,
                                             TypedObjectPrediction elemTypeReprs,
                                             int32_t elemSize);
+    // selectively logs its analysis decisions
+    bool ElementAccessIsDenseNative(MDefinition *obj, MDefinition *id, bool log = false);
 
     enum BoundsChecking { DoBoundsCheck, SkipBoundsCheck };
 

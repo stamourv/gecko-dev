@@ -6830,26 +6830,49 @@ IonBuilder::jsop_getelem()
 
     bool emitted = false;
 
-    if (!getElemTryTypedObject(&emitted, obj, index) || emitted)
+    addOptInfoLocation("getelem");
+
+    addOptInfoTypeset("obj types:", obj->resultTypeSet());
+    // MIR type is info enough here
+    addOptInfoMIRType("index types:", index->type());
+
+    if (!getElemTryTypedObject(&emitted, obj, index) || emitted) {
+        // not reporting failures because this strategy can't apply in most
+        // cases, by design, so failures are not an issue
+        addOptInfo("trying typed object");
+        addOptInfo("success");
         return emitted;
+    }
 
     if (!getElemTryDense(&emitted, obj, index) || emitted)
         return emitted;
 
-    if (!getElemTryTypedStatic(&emitted, obj, index) || emitted)
+    if (!getElemTryTypedStatic(&emitted, obj, index) || emitted) {
+        addOptInfo("trying static typed array");
+        addOptInfo("success");
         return emitted;
+    }
 
-    if (!getElemTryTypedArray(&emitted, obj, index) || emitted)
+    if (!getElemTryTypedArray(&emitted, obj, index) || emitted) {
+        addOptInfo("trying typed array");
+        addOptInfo("success");
         return emitted;
+    }
 
     if (!getElemTryString(&emitted, obj, index) || emitted)
         return emitted;
 
-    if (!getElemTryArguments(&emitted, obj, index) || emitted)
+    if (!getElemTryArguments(&emitted, obj, index) || emitted) {
+        addOptInfo("trying arguments");
+        addOptInfo("success");
         return emitted;
+    }
 
-    if (!getElemTryArgumentsInlined(&emitted, obj, index) || emitted)
+    if (!getElemTryArgumentsInlined(&emitted, obj, index) || emitted) {
+        addOptInfo("trying arguments (inlined function case)");
+        addOptInfo("success");
         return emitted;
+    }
 
     if (script()->argumentsHasVarBinding() && obj->mightBeType(MIRType_MagicOptimizedArguments))
         return abort("Type is not definitely lazy arguments.");
@@ -6865,6 +6888,9 @@ IonBuilder::jsop_getelem()
 
     if (!resumeAfter(ins))
         return false;
+
+    addOptInfo("trying emitting a call");
+    addOptInfo("success");
 
     types::TemporaryTypeSet *types = bytecodeTypes(pc);
     return pushTypeBarrier(ins, types, BarrierKind::TypeSet);
@@ -7141,22 +7167,30 @@ IonBuilder::getElemTryDense(bool *emitted, MDefinition *obj, MDefinition *index)
 {
     JS_ASSERT(*emitted == false);
 
-    if (!ElementAccessIsDenseNative(obj, index))
+    addOptInfo("trying dense access");
+
+    if (!ElementAccessIsDenseNative(obj, index, /* log = */ true))
         return true;
 
     // Don't generate a fast path if there have been bounds check failures
     // and this access might be on a sparse property.
-    if (ElementAccessHasExtraIndexedProperty(constraints(), obj) && failedBoundsCheck_)
+    if (ElementAccessHasExtraIndexedProperty(constraints(), obj) && failedBoundsCheck_) {
+        addOptInfo("failure, seen failed bounds check and may be sparse");
         return true;
+    }
 
     // Don't generate a fast path if this pc has seen negative indexes accessed,
     // which will not appear to be extra indexed properties.
-    if (inspector->hasSeenNegativeIndexGetElement(pc))
+    if (inspector->hasSeenNegativeIndexGetElement(pc)) {
+        addOptInfo("failure, seen negative indexes");
         return true;
+    }
 
     // Emit dense getelem variant.
     if (!jsop_getelem_dense(obj, index))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
@@ -7250,13 +7284,24 @@ IonBuilder::getElemTryString(bool *emitted, MDefinition *obj, MDefinition *index
 {
     JS_ASSERT(*emitted == false);
 
-    if (obj->type() != MIRType_String || !IsNumberType(index->type()))
+    addOptInfo("trying string");
+
+    if (obj->type() != MIRType_String) {
+        // that's an irrelevant failure, prune at the coach level
+        addOptInfo("failure, not a string");
         return true;
+    }
+    if (!IsNumberType(index->type())) {
+        addOptInfo("failure, index not a number");
+        return true;
+    }
 
     // If the index is expected to be out-of-bounds, don't optimize to avoid
     // frequent bailouts.
-    if (bytecodeTypes(pc)->hasType(types::Type::UndefinedType()))
+    if (bytecodeTypes(pc)->hasType(types::Type::UndefinedType())) {
+        addOptInfo("failure, index expected to be out of bounds");
         return true;
+    }
 
     // Emit fast path for string[index].
     MInstruction *idInt32 = MToInt32::New(alloc(), index);
@@ -7274,6 +7319,8 @@ IonBuilder::getElemTryString(bool *emitted, MDefinition *obj, MDefinition *index
     MFromCharCode *result = MFromCharCode::New(alloc(), charCode);
     current->add(result);
     current->push(result);
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;
@@ -7363,27 +7410,36 @@ IonBuilder::getElemTryCache(bool *emitted, MDefinition *obj, MDefinition *index)
 {
     JS_ASSERT(*emitted == false);
 
+    addOptInfo("trying emitting a polymorphic cache");
+
     // Make sure we have at least an object.
-    if (!obj->mightBeType(MIRType_Object))
+    if (!obj->mightBeType(MIRType_Object)) {
+        addOptInfo("failure, not an object");
         return true;
+    }
 
     // Don't cache for strings.
-    if (obj->mightBeType(MIRType_String))
+    if (obj->mightBeType(MIRType_String)) {
+        addOptInfo("failure, string");
         return true;
+    }
 
     // Index should be integer, string, or symbol
     if (!index->mightBeType(MIRType_Int32) &&
         !index->mightBeType(MIRType_String) &&
         !index->mightBeType(MIRType_Symbol))
     {
+        addOptInfo("failure, index not an integer, string or symbol");
         return true;
     }
 
     // Turn off cacheing if the element is int32 and we've seen non-native objects as the target
     // of this getelem.
     bool nonNativeGetElement = inspector->hasSeenNonNativeGetElement(pc);
-    if (index->mightBeType(MIRType_Int32) && nonNativeGetElement)
+    if (index->mightBeType(MIRType_Int32) && nonNativeGetElement) {
+        addOptInfo("failure, element type int32 with non-native objects as target");
         return true;
+    }
 
     // Emit GetElementCache.
 
@@ -7419,6 +7475,8 @@ IonBuilder::getElemTryCache(bool *emitted, MDefinition *obj, MDefinition *index)
 
     if (!pushTypeBarrier(ins, types, barrier))
         return false;
+
+    addOptInfo("success");
 
     *emitted = true;
     return true;

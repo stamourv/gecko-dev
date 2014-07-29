@@ -3518,21 +3518,39 @@ MArrayJoin::foldsTo(TempAllocator &alloc) {
 }
 
 bool
-jit::ElementAccessIsDenseNative(MDefinition *obj, MDefinition *id)
+IonBuilder::ElementAccessIsDenseNative(MDefinition *obj, MDefinition *id, bool log)
 {
-    if (obj->mightBeType(MIRType_String))
+    if (obj->mightBeType(MIRType_String)) {
+        if (log) addOptInfo("failure, may be a string");
         return false;
+    }
 
-    if (id->type() != MIRType_Int32 && id->type() != MIRType_Double)
+    if (id->type() != MIRType_Int32 && id->type() != MIRType_Double) {
+        if (log) addOptInfo("failure, index is not a number");
         return false;
+    }
 
     types::TemporaryTypeSet *types = obj->resultTypeSet();
-    if (!types)
+    if (!types) {
+        if (log) addOptInfo("failure, no type info");
         return false;
+    }
 
-    // Typed arrays are native classes but do not have dense elements.
     const Class *clasp = types->getKnownClass();
-    return clasp && clasp->isNative() && !IsTypedArrayClass(clasp);
+    if (!clasp) {
+        if (log) addOptInfo("failure, no known class");
+        return false;
+    }
+    if (!clasp->isNative()) {
+        if (log) addOptInfo("failure, non native");
+        return false;
+    }
+    // Typed arrays are native classes but do not have dense elements.
+    if (IsTypedArrayClass(clasp)) {
+        if (log) addOptInfo("failure, typed array");
+        return false;
+    }
+    return true;
 }
 
 bool
