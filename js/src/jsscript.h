@@ -824,10 +824,10 @@ class JSScript : public js::gc::BarrieredCell<JSScript>
                                  * Reset if the script's JIT code is forcibly
                                  * discarded. */
 
-#ifdef DEBUG
     // Unique identifier within the compartment for this script, used for
     // printing analysis information.
     uint32_t        id_;
+#ifdef DEBUG
     uint32_t        idpad;
 #endif
 
@@ -1371,11 +1371,7 @@ class JSScript : public js::gc::BarrieredCell<JSScript>
     /* Return whether this script was compiled for 'eval' */
     bool isForEval() { return isCachedEval() || isActiveEval(); }
 
-#ifdef DEBUG
     unsigned id();
-#else
-    unsigned id() { return 0; }
-#endif
 
     /* Ensure the script has a TypeScript. */
     inline bool ensureHasTypes(JSContext *cx);

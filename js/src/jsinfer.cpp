@@ -131,6 +131,17 @@ types::TypeString(Type type)
     return bufs[which];
 }
 
+unsigned JSScript::id() {
+    if (!id_) {
+        id_ = ++compartment()->types.scriptCount;
+#ifdef DEBUG
+        InferSpew(ISpewOps, "script #%u: %p %s:%d",
+                  id_, this, filename() ? filename() : "<null>", lineno());
+#endif
+    }
+    return id_;
+}
+
 #ifdef DEBUG
 
 static bool InferSpewActive(SpewChannel channel)
@@ -207,15 +218,6 @@ const char *
 types::TypeObjectString(TypeObject *type)
 {
     return TypeString(Type::ObjectType(type));
-}
-
-unsigned JSScript::id() {
-    if (!id_) {
-        id_ = ++compartment()->types.scriptCount;
-        InferSpew(ISpewOps, "script #%u: %p %s:%d",
-                  id_, this, filename() ? filename() : "<null>", lineno());
-    }
-    return id_;
 }
 
 void
