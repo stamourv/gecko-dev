@@ -4500,7 +4500,7 @@ JSCompartment::sweepNewTypeObjectTable(TypeObjectWithNewScriptSet &table)
             TypeObjectWithNewScriptEntry entry = e.front();
             if (IsTypeObjectAboutToBeFinalized(entry.object.unsafeGet()) ||
                 (entry.newFunction.get()
-                 && IsObjectAboutToBeFinalized(&entry.newFunction.unsafeGet()))) {
+                 && IsObjectAboutToBeFinalized(entry.newFunction.unsafeGet()))) {
                 e.removeFront();
             } else {
                 /* Any rekeying necessary is handled by fixupNewTypeObjectTable() below. */
