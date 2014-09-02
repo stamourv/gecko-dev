@@ -642,8 +642,8 @@ TypeSet::toString(char *str, int32_t len, bool showConstructor,
                         JSFunction *function = constructor->functionDelazifying();
                         const jschar *constructorName = u"(unknown-constructor-name)";
                         if (function && function->name()) {
-                            constructorName
-                                = JSID_TO_FLAT_STRING(NameToId(function->name()))->chars();
+                            JS::AutoCheckCannotGC nogc;
+                            constructorName = function->name()->twoByteChars(nogc);
                         }
                         JS_snprintf(tmp, tmpLen, " %hs:%s:%u:%s",
                                     constructorName,
@@ -4573,7 +4573,7 @@ JSCompartment::checkTypeObjectTableAfterMovingGC(TypeObjectWithNewScriptSet &tab
         TaggedProto proto = entry.object->proto();
         if (proto.isObject())
             CheckGCThingAfterMovingGC(proto.toObject());
-        CheckGCThingAfterMovingGC(entry.newFunction);
+        CheckGCThingAfterMovingGC(entry.newFunction.get());
 
         TypeObjectWithNewScriptEntry::Lookup
             lookup(entry.object->clasp(), proto, entry.newFunction);

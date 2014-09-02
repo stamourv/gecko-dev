@@ -8834,10 +8834,10 @@ IonBuilder::addOptInfoLocation(const char* op)
 void
 IonBuilder::addOptInfoLocationProperty(const char* op, PropertyName *name)
 {
-    jsid id = name ? NameToId(name) : JSID_VOID;
     size_t bufsize = 100; // should be enough
     char *log = js_pod_malloc<char>(bufsize);
-    JS_snprintf(log, bufsize, "%s %hs", op, JSID_TO_FLAT_STRING(id)->chars());
+    JS::AutoCheckCannotGC nogc;
+    JS_snprintf(log, bufsize, "%s %hs", op, name->twoByteChars(nogc));
     addOptInfoLocation(log);
 }
 
