@@ -643,13 +643,26 @@ TypeSet::toString(char *str, int32_t len, bool showConstructor,
                         const jschar *constructorName = u"(unknown-constructor-name)";
                         if (function && function->name()) {
                             JS::AutoCheckCannotGC nogc;
-                            constructorName = function->name()->twoByteChars(nogc);
+                            PropertyName *name = function->name();
+                            if (name->hasLatin1Chars()) {
+                                // different format string, print right away
+                                JS_snprintf(tmp, tmpLen, " %s:%s:%u:%s",
+                                            name->latin1Chars(nogc),
+                                            constructor->filename(),
+                                            constructor->lineno(),
+                                            TypeString(Type::ObjectType(object)));
+                                constructorName = nullptr;
+                            } else {
+                                constructorName = name->twoByteChars(nogc);
+                            }
                         }
-                        JS_snprintf(tmp, tmpLen, " %hs:%s:%u:%s",
-                                    constructorName,
-                                    constructor->filename(),
-                                    constructor->lineno(),
-                                    TypeString(Type::ObjectType(object)));
+                        if (constructorName != nullptr) {
+                            JS_snprintf(tmp, tmpLen, " %hs:%s:%u:%s",
+                                        constructorName,
+                                        constructor->filename(),
+                                        constructor->lineno(),
+                                        TypeString(Type::ObjectType(object)));
+                        }
                     } else {
                         JS_snprintf(tmp, tmpLen, " (unknown-constructor):%s",
                                     TypeString(Type::ObjectType(object)));

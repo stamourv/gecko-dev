@@ -8837,7 +8837,11 @@ IonBuilder::addOptInfoLocationProperty(const char* op, PropertyName *name)
     size_t bufsize = 100; // should be enough
     char *log = js_pod_malloc<char>(bufsize);
     JS::AutoCheckCannotGC nogc;
-    JS_snprintf(log, bufsize, "%s %hs", op, name->twoByteChars(nogc));
+    if (name->hasLatin1Chars()) {
+        JS_snprintf(log, bufsize, "%s %s", op, name->latin1Chars(nogc));
+    } else {
+        JS_snprintf(log, bufsize, "%s %hs", op, name->twoByteChars(nogc));
+    }
     addOptInfoLocation(log);
 }
 
