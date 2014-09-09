@@ -1114,7 +1114,7 @@ TypeObjectKey::lookupConstructor(TypeObjectWithNewScriptSet *newTypeObjects)
         TypeObjectWithNewScriptEntry k = e.front();
         if (maybeType() == k.object.get()) { // found it
             JSFunction *f = k.newFunction;
-            if (f != nullptr) {
+            if (f != nullptr && f->hasScript()) {
                 return f->nonLazyScript();
             }
             return nullptr;
