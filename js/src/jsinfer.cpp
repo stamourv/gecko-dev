@@ -657,7 +657,7 @@ TypeSet::toString(char *str, int32_t len, bool showConstructor,
                             }
                         }
                         if (constructorName != nullptr) {
-                            JS_snprintf(tmp, tmpLen, " %hs:%s:%u:%s",
+                            JS_snprintf(tmp, tmpLen, " %s:%s:%u:%s",
                                         constructorName,
                                         constructor->filename(),
                                         constructor->lineno(),
